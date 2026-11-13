@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    {{ ui.brand(url_for('main.landing')) }}
+    <h1>Sign in</h1>
+    <p class="sub">Deployment history and incidents for your services.</p>
+    <form class="panel" method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {{ ui.field(form.username, autofocus=true, autocomplete="username") }}
+      {{ ui.field(form.password, autocomplete="current-password") }}
+      <button class="btn btn-primary w-100" type="submit">Sign in</button>
+    </form>
+    <p class="auth-foot">No account? <a class="link" href="{{ url_for('auth.register') }}">Create one</a></p>
+    <p class="auth-legal">Passwords are stored as salted hashes. Sessions use a signed cookie.</p>
+  </div>
+</div>
+{% endblock %}

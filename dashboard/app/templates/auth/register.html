@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Create account{% endblock %}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    {{ ui.brand(url_for('main.landing')) }}
+    <h1>Create account</h1>
+    <p class="sub">Any account can view and manage all services.</p>
+    <form class="panel" method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {{ ui.field(form.username, autofocus=true, autocomplete="username") }}
+      {{ ui.field(form.email, autocomplete="email") }}
+      {{ ui.field(form.password, hint="At least 8 characters.", autocomplete="new-password") }}
+      {{ ui.field(form.confirm, autocomplete="new-password") }}
+      <button class="btn btn-primary w-100" type="submit">Create account</button>
+    </form>
+    <p class="auth-foot">Already registered? <a class="link" href="{{ url_for('auth.login') }}">Sign in</a></p>
+  </div>
+</div>
+{% endblock %}

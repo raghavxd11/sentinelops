@@ -1,0 +1,68 @@
+{% extends "shell.html" %}
+{% block title %}Deployments{% endblock %}
+{% block crumbs %}sentinelops<span class="sep">/</span>deployments{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div class="pills" role="navigation" aria-label="Filter by status">
+    {% for key, label in [("", "All"), ("SUCCESS", "Success"), ("FAILED", "Failed"), ("ROLLED_BACK", "Rolled back"), ("IN_PROGRESS", "In progress")] %}
+    <a class="pill{% if status == key %} active{% endif %}"
+       href="{{ url_for('deployments.list_deployments', status=key or none, q=search or none) }}">
+      {{ label }} <span class="n">{{ counts[key or "ALL"] }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if search %}
+  <p>Matching "<span class="mono">{{ search }}</span>" <a class="link ms-1" href="{{ url_for('deployments.list_deployments', status=status or none) }}">clear</a></p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  {% if deployments %}
+  <div class="table-wrap">
+    <table class="table-ops">
+      <thead>
+        <tr>
+          <th>Status</th><th>Service</th><th>Commit</th><th>Message</th><th>Author</th>
+          <th>Build</th><th>Image tag</th><th class="num">Duration</th><th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deployments %}
+        <tr>
+          <td>{{ ui.status(d.status) }}</td>
+          <td class="nowrap">{{ d.service.name }}</td>
+          <td>
+            <span class="mono copyable"><a href="{{ url_for('deployments.detail', deployment_id=d.id) }}">{{ d.short_hash }}</a><button type="button" class="copy-btn" data-copy="{{ d.commit_hash }}" title="Copy full hash" aria-label="Copy commit hash"><i class="bi bi-copy"></i></button></span>
+          </td>
+          <td><div class="truncate" title="{{ d.commit_message }}">{{ d.commit_message }}</div></td>
+          <td>{{ ui.author(d.commit_author) }}</td>
+          <td class="mono nowrap">{% if d.build_number is not none %}#{{ d.build_number }}{% else %}-{% endif %}</td>
+          <td>{{ ui.copyable(d.image_tag) }}</td>
+          <td class="num nowrap">{{ d.duration_seconds|duration }}</td>
+          <td class="nowrap text-2">{{ ui.when(d.created_at) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="pager">
+    <span>{{ pagination.first }}-{{ pagination.last }} of {{ pagination.total }}</span>
+    <span>
+      {% if pagination.has_prev %}<a class="btn btn-secondary btn-sm" href="{{ url_for('deployments.list_deployments', status=status or none, q=search or none, page=pagination.prev_num) }}">Newer</a>{% endif %}
+      {% if pagination.has_next %}<a class="btn btn-secondary btn-sm" href="{{ url_for('deployments.list_deployments', status=status or none, q=search or none, page=pagination.next_num) }}">Older</a>{% endif %}
+    </span>
+  </div>
+  {% else %}
+  <div class="empty">
+    {% if search or status %}
+    <p>No deployments match this filter.</p>
+    <a class="btn btn-secondary" href="{{ url_for('deployments.list_deployments') }}">Show all</a>
+    {% else %}
+    <p>No deployments recorded yet. Jenkins reports them to <span class="mono">POST /api/deployments</span>.</p>
+    <a class="btn btn-secondary" href="{{ url_for('main.api_docs') }}">Open API docs</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

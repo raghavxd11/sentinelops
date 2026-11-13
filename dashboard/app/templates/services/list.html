@@ -1,0 +1,92 @@
+{% extends "shell.html" %}
+{% block title %}Services{% endblock %}
+{% block crumbs %}sentinelops<span class="sep">/</span>services{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <p>{{ services|length }} service{{ "" if services|length == 1 else "s" }} tracked. Jenkins reports deployments by service name.</p>
+  <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#serviceModal"
+          data-action="{{ url_for('services.create') }}" data-title="Add service">Add service</button>
+</div>
+
+<div class="panel">
+  {% if services %}
+  <div class="table-wrap">
+    <table class="table-ops">
+      <thead>
+        <tr>
+          <th>Name</th><th>Repository</th><th>Health URL</th><th>Last deployment</th>
+          <th class="num">Deploys</th><th><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for service in services %}
+        {% set last = service.last_deployment %}
+        <tr>
+          <td>
+            <a class="mono" href="{{ url_for('deployments.list_deployments', q=service.name) }}">{{ service.name }}</a>
+            {% if service.description %}<div class="cell-sub">{{ service.description }}</div>{% endif %}
+          </td>
+          <td>
+            {% if service.repo_url %}
+            <a class="link" href="{{ service.repo_url }}" target="_blank" rel="noopener">{{ service.repo_url|replace("https://", "") }}</a>
+            {% else %}<span class="muted">-</span>{% endif %}
+          </td>
+          <td>{% if service.health_url %}{{ ui.copyable(service.health_url) }}{% else %}<span class="muted">-</span>{% endif %}</td>
+          <td class="nowrap">
+            {% if last %}
+            {{ ui.status(last.status) }}
+            <a class="mono ms-1" href="{{ url_for('deployments.detail', deployment_id=last.id) }}">{{ last.short_hash }}</a>
+            <span class="cell-sub ms-1">{{ ui.when(last.created_at) }}</span>
+            {% else %}<span class="muted">never deployed</span>{% endif %}
+          </td>
+          <td class="num">{{ service.deploy_count }}</td>
+          <td class="actions">
+            <button class="icon-btn" type="button" title="Edit" aria-label="Edit {{ service.name }}"
+                    data-bs-toggle="modal" data-bs-target="#serviceModal"
+                    data-action="{{ url_for('services.edit', service_id=service.id) }}" data-title="Edit service"
+                    data-name="{{ service.name }}" data-description="{{ service.description }}"
+                    data-repo_url="{{ service.repo_url }}" data-health_url="{{ service.health_url }}"><i class="bi bi-pencil"></i></button>
+            <button class="icon-btn danger" type="button" title="Delete" aria-label="Delete {{ service.name }}"
+                    data-bs-toggle="modal" data-bs-target="#confirmModal"
+                    data-action="{{ url_for('services.delete', service_id=service.id) }}"
+                    data-title="Delete {{ service.name }}?"
+                    data-text="This also deletes its {{ service.deploy_count }} deployments and their incidents. It cannot be undone."><i class="bi bi-trash3"></i></button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>No services yet. Add the app your pipeline deploys.</p>
+    <button class="btn btn-secondary" type="button" data-bs-toggle="modal" data-bs-target="#serviceModal"
+            data-action="{{ url_for('services.create') }}" data-title="Add service">Add service</button>
+  </div>
+  {% endif %}
+</div>
+
+{# One modal for both Add and Edit. app.js fills it from the clicked button. #}
+<div class="modal fade" id="serviceModal" tabindex="-1" aria-hidden="true" data-show-on-load="{{ 'true' if show_modal else 'false' }}">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" method="post" action="{{ modal_action }}" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="modal-header">
+        <h2 class="modal-title">{{ modal_title }}</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        {{ ui.field(form.name, hint="Must match the name Jenkins sends, for example demo-app.", mono=true, placeholder="demo-app") }}
+        {{ ui.field(form.description, placeholder="What this service is") }}
+        {{ ui.field(form.repo_url, placeholder="https://github.com/user/repo") }}
+        {{ ui.field(form.health_url, mono=true, placeholder="http://localhost:8000/health") }}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

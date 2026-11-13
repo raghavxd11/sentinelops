@@ -1,0 +1,96 @@
+{% extends "shell.html" %}
+{% block title %}API docs{% endblock %}
+{% block crumbs %}sentinelops<span class="sep">/</span>api{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <p>JSON over HTTP. Base URL <span class="mono">{{ base_url }}</span>. The GET responses below are live data from this database.</p>
+</div>
+
+<div class="panel">
+
+  <section class="endpoint">
+    <div class="endpoint-head">
+      <span class="method post">POST</span><span class="mono">/api/deployments</span>
+      <span class="sev">X-API-Token required</span>
+    </div>
+    <p>Jenkins calls this at the end of every pipeline run. The token must equal the <span class="mono">API_TOKEN</span>
+      environment variable and is compared in constant time. A status of <span class="mono">FAILED</span> or
+      <span class="mono">ROLLED_BACK</span> opens an incident linked to the deployment.</p>
+    <div class="code-label">Body fields</div>
+    <table class="fields">
+      <tr><td>service</td><td>required</td><td>Name of a service on the Services page</td></tr>
+      <tr><td>commit_hash</td><td>required</td><td>Full git commit SHA</td></tr>
+      <tr><td>status</td><td>required</td><td>SUCCESS, FAILED, ROLLED_BACK or IN_PROGRESS</td></tr>
+      <tr><td>commit_author, commit_message, branch</td><td>optional</td><td>Shown in the trace</td></tr>
+      <tr><td>build_number, duration_seconds</td><td>optional</td><td>Integers</td></tr>
+      <tr><td>image_tag</td><td>optional</td><td>Defaults to the short commit SHA</td></tr>
+      <tr><td>failed_stage</td><td>optional</td><td>Checkout, Test, Build, Scan, Push, Deploy or Health check</td></tr>
+      <tr><td>committed_at</td><td>optional</td><td>ISO 8601 commit time, used for lead time</td></tr>
+    </table>
+    <div class="code-label">Request</div>
+<pre class="code">curl -X POST {{ base_url }}/api/deployments \
+  -H "X-API-Token: $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "demo-app",
+    "commit_hash": "7c1e4b9d2f0a8e6b5c3d1f4a9b8e7d6c5b4a3f21",
+    "commit_author": "Raghav Pandey",
+    "commit_message": "feat: read greeting from GREETING env var",
+    "branch": "main",
+    "build_number": 48,
+    "image_tag": "7c1e4b9",
+    "status": "ROLLED_BACK",
+    "duration_seconds": 162,
+    "committed_at": "2026-11-13T14:01:52+05:30"
+  }'</pre>
+    <div class="code-label">Response <span class="mono">201 Created</span> (<span class="mono">200</span> when it completes a build reported earlier as IN_PROGRESS)</div>
+<pre class="code">{
+  "id": 51,
+  "service": "demo-app",
+  "status": "ROLLED_BACK",
+  "incident_id": 12,
+  ...
+}</pre>
+    <div class="code-label">Errors</div>
+    <table class="fields">
+      <tr><td>400</td><td>Missing field, unknown status, or body is not JSON</td></tr>
+      <tr><td>401</td><td>Missing or wrong X-API-Token</td></tr>
+      <tr><td>404</td><td>Service name is not registered</td></tr>
+    </table>
+  </section>
+
+  <section class="endpoint">
+    <div class="endpoint-head"><span class="method get">GET</span><span class="mono">/api/deployments</span></div>
+    <p>Newest first. Query parameters: <span class="mono">status</span>, <span class="mono">service</span>,
+      <span class="mono">limit</span> (default 50, maximum 200).</p>
+    <div class="code-label">Request</div>
+    <pre class="code">curl "{{ base_url }}/api/deployments?limit=1"</pre>
+    <div class="code-label">Response <span class="mono">200 OK</span></div>
+    <pre class="code">{{ ([latest] if latest else [])|tojson(indent=2) }}</pre>
+  </section>
+
+  <section class="endpoint">
+    <div class="endpoint-head"><span class="method get">GET</span><span class="mono">/api/stats</span></div>
+    <p>The numbers behind the Overview page: totals, success rate, deployment frequency, MTTR and lead time. Durations are in seconds.</p>
+    <div class="code-label">Request</div>
+    <pre class="code">curl {{ base_url }}/api/stats</pre>
+    <div class="code-label">Response <span class="mono">200 OK</span></div>
+    <pre class="code">{{ stats|tojson(indent=2) }}</pre>
+  </section>
+
+  <section class="endpoint">
+    <div class="endpoint-head"><span class="method get">GET</span><span class="mono">/health</span></div>
+    <p>Liveness check used by the Docker <span class="mono">HEALTHCHECK</span>. Runs <span class="mono">SELECT 1</span>
+      against the database and returns <span class="mono">503</span> if it does not answer.</p>
+    <div class="code-label">Request</div>
+    <pre class="code">curl {{ base_url }}/health</pre>
+    <div class="code-label">Response <span class="mono">200 OK</span></div>
+<pre class="code">{
+  "database": "ok",
+  "status": "ok"
+}</pre>
+  </section>
+
+</div>
+{% endblock %}

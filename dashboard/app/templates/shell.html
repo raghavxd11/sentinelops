@@ -1,0 +1,77 @@
+{# Logged-in layout: sidebar, top bar, page content. #}
+{% extends "base.html" %}
+
+{% block body %}
+{# Which sidebar item is highlighted: the blueprint name, or the endpoint for main pages. #}
+{% set active_section = request.blueprint if request.blueprint != "main" else request.endpoint %}
+{% macro nav(endpoint, icon, label, section) %}
+<a class="nav-item{% if active_section == section %} active{% endif %}" href="{{ url_for(endpoint) }}"
+   {% if active_section == section %}aria-current="page"{% endif %}>
+  <i class="bi {{ icon }}"></i>{{ label }}
+</a>
+{% endmacro %}
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-head">{{ ui.brand(url_for('main.overview')) }}</div>
+  <nav class="sidebar-nav" aria-label="Main">
+    {{ nav('main.overview', 'bi-speedometer2', 'Overview', 'main.overview') }}
+    {{ nav('services.list_services', 'bi-hdd-stack', 'Services', 'services') }}
+    {{ nav('deployments.list_deployments', 'bi-box-seam', 'Deployments', 'deployments') }}
+    {{ nav('incidents.list_incidents', 'bi-exclamation-triangle', 'Incidents', 'incidents') }}
+    <div class="nav-section">Reference</div>
+    {{ nav('main.api_docs', 'bi-braces', 'API docs', 'main.api_docs') }}
+  </nav>
+  <div class="sidebar-foot">
+    <span class="avatar" aria-hidden="true">{{ current_user.username|initials }}</span>
+    <div class="who">
+      <div>{{ current_user.username }}</div>
+      <div class="small-12 muted">{{ current_user.email }}</div>
+    </div>
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out"><i class="bi bi-box-arrow-right"></i></button>
+    </form>
+  </div>
+</aside>
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+<div class="main">
+  <header class="topbar">
+    <button class="icon-btn menu-btn" type="button" data-menu aria-label="Open menu"><i class="bi bi-list"></i></button>
+    <div class="topbar-title">
+      <div class="crumbs">{% block crumbs %}{% endblock %}</div>
+      <h1>{% block heading %}{{ self.title() }}{% endblock %}</h1>
+    </div>
+    {% if has_seed_data() %}
+    <span class="demo-note" title="Some rows were inserted by seed.py. Remove them with: python seed.py --clear">demo data</span>
+    {% endif %}
+    <form class="topbar-search" action="{{ url_for('deployments.list_deployments') }}" role="search">
+      <i class="bi bi-search"></i>
+      <input class="form-control" type="search" name="q" placeholder="Search commits, authors, tags"
+             aria-label="Search deployments" value="{{ search|default('') }}">
+    </form>
+    <button class="icon-btn" type="button" data-theme-toggle title="Switch light / dark" aria-label="Switch light / dark theme"><i class="bi bi-circle-half"></i></button>
+  </header>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+{# One confirmation dialog shared by every delete button. #}
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <form class="modal-content" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-header">
+        <h2 class="modal-title" data-confirm-title>Delete</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-2" data-confirm-text></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

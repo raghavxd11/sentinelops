@@ -1,0 +1,16 @@
+{# Used for 400, 404, 405 and 500. Does not touch the database. #}
+{% extends "base.html" %}
+{% block title %}{{ code }} {{ title }}{% endblock %}
+
+{% block body %}
+<div class="error-page">
+  {{ ui.brand(url_for('main.landing')) }}
+  <div class="code-num">{{ code }}</div>
+  <h1>{{ title }}</h1>
+  <p class="mt-2">{{ detail }}</p>
+  <pre class="code mb-3"><span class="c-dim">{{ request.method }}</span> {{ request.path }}  <span class="{{ 'c-fail' if code >= 500 else 'c-warn' }}">{{ code }}</span></pre>
+  <div>
+    <a class="btn btn-secondary" href="{{ url_for('main.landing') }}">Back to overview</a>
+  </div>
+</div>
+{% endblock %}

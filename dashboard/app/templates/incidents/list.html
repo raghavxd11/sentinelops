@@ -1,0 +1,77 @@
+{% extends "shell.html" %}
+{% block title %}Incidents{% endblock %}
+{% block crumbs %}sentinelops<span class="sep">/</span>incidents{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div class="pills" role="navigation" aria-label="Filter by status">
+    {% for key, label in [("OPEN", "Open"), ("RESOLVED", "Resolved"), ("ALL", "All")] %}
+    <a class="pill{% if status == key %} active{% endif %}" href="{{ url_for('incidents.list_incidents', status=key) }}">
+      {{ label }} <span class="n">{{ counts[key] }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('incidents.create') }}">New incident</a>
+</div>
+
+<div class="panel">
+  {% if incidents %}
+  <div class="table-wrap">
+    <table class="table-ops">
+      <thead>
+        <tr>
+          <th>Severity</th><th>Incident</th><th>Service</th><th>Deployment</th>
+          <th>Status</th><th>Age</th><th><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for incident in incidents %}
+        <tr>
+          <td>{{ ui.severity(incident.severity) }}</td>
+          <td>
+            <a href="{{ url_for('incidents.edit', incident_id=incident.id) }}"><span class="mono muted">#{{ incident.id }}</span> {{ incident.title }}</a>
+            {% if incident.root_cause %}<div class="cell-sub truncate wide" title="{{ incident.root_cause }}">{{ incident.root_cause }}</div>
+            {% elif incident.status == "OPEN" %}<div class="cell-sub">Root cause not written yet</div>{% endif %}
+          </td>
+          <td class="nowrap">{{ incident.service.name }}</td>
+          <td>
+            {% if incident.deployment %}<a class="mono" href="{{ url_for('deployments.detail', deployment_id=incident.deployment.id) }}">{{ incident.deployment.short_hash }}</a>
+            {% else %}<span class="muted">-</span>{% endif %}
+          </td>
+          <td>{{ ui.status(incident.status) }}</td>
+          <td class="nowrap text-2">
+            {% if incident.resolved_at %}
+            <span title="Opened {{ incident.created_at|fulldate }}, resolved {{ incident.resolved_at|fulldate }}">resolved in {{ (incident.resolved_at - incident.created_at).total_seconds()|duration }}</span>
+            {% else %}opened {{ ui.when(incident.created_at) }}{% endif %}
+          </td>
+          <td class="actions">
+            {% if incident.status == "OPEN" %}
+            <form method="post" action="{{ url_for('incidents.resolve', incident_id=incident.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-secondary btn-sm" type="submit">Mark resolved</button>
+            </form>
+            {% endif %}
+            <a class="icon-btn" href="{{ url_for('incidents.edit', incident_id=incident.id) }}" title="Edit" aria-label="Edit incident {{ incident.id }}"><i class="bi bi-pencil"></i></a>
+            <button class="icon-btn danger" type="button" title="Delete" aria-label="Delete incident {{ incident.id }}"
+                    data-bs-toggle="modal" data-bs-target="#confirmModal"
+                    data-action="{{ url_for('incidents.delete', incident_id=incident.id) }}"
+                    data-title="Delete incident #{{ incident.id }}?"
+                    data-text="The incident and its root-cause note are removed. The linked deployment is kept."><i class="bi bi-trash3"></i></button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    {% if status == "OPEN" %}
+    <p>No open incidents. Failed and rolled back deployments open one automatically.</p>
+    {% else %}
+    <p>No incidents here.</p>
+    {% endif %}
+    <a class="btn btn-secondary" href="{{ url_for('incidents.create') }}">New incident</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

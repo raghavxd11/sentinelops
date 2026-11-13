@@ -1,0 +1,43 @@
+{# Reusable template pieces. Import with: {% import "_macros.html" as ui %} #}
+
+{% macro logo(size=20) -%}
+<svg class="logo-mark" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9.5-4.1-1.6-7-5.3-7-9.5V6l7-3z"/><path d="M8.5 10.5h7"/><path d="M12 10.5v5"/></svg>
+{%- endmacro %}
+
+{% macro brand(href) -%}
+<a class="brand" href="{{ href }}">{{ logo() }}<span class="brand-name">sentinelops</span></a>
+{%- endmacro %}
+
+{% macro status(value) -%}
+<span class="status status-{{ value|status_class }}"><span class="dot"></span>{{ value|status_label }}</span>
+{%- endmacro %}
+
+{% macro severity(value) -%}
+<span class="sev sev-{{ value|lower }}">{{ value }}</span>
+{%- endmacro %}
+
+{# Relative time with the full date on hover. #}
+{% macro when(dt) -%}
+{% if dt %}<time datetime="{{ dt.isoformat() }}Z" title="{{ dt|fulldate }}">{{ dt|timeago }}</time>{% else %}<span class="muted">-</span>{% endif %}
+{%- endmacro %}
+
+{# Monospace value with a copy button. #}
+{% macro copyable(value, shown=None) -%}
+<span class="mono copyable">{{ shown or value }}<button type="button" class="copy-btn" data-copy="{{ value }}" title="Copy" aria-label="Copy {{ value }}"><i class="bi bi-copy"></i></button></span>
+{%- endmacro %}
+
+{% macro author(name) -%}
+<span class="author"><span class="avatar" aria-hidden="true">{{ name|initials }}</span>{{ name or "unknown" }}</span>
+{%- endmacro %}
+
+{# Form field with label and inline validation message. #}
+{% macro field(f, hint=None, mono=False) -%}
+{% set base = "form-select" if f.type == "SelectField" else "form-control" %}
+{% set classes = base ~ (" is-invalid" if f.errors else "") ~ (" mono" if mono else "") %}
+<div class="mb-3">
+  {{ f.label(class="form-label") }}
+  {{ f(class=classes, **kwargs) }}
+  {% for message in f.errors %}<div class="invalid-feedback d-block">{{ message }}</div>{% endfor %}
+  {% if hint %}<div class="form-hint">{{ hint }}</div>{% endif %}
+</div>
+{%- endmacro %}

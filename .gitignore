@@ -1,0 +1,32 @@
+# secrets and local config
+.env
+*.pem
+*.key
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+test-results/
+
+# local sqlite database (Flask instance folder)
+instance/
+*.db
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

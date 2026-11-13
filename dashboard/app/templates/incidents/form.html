@@ -1,0 +1,60 @@
+{% extends "shell.html" %}
+{% block title %}{% if incident %}Incident #{{ incident.id }}{% else %}New incident{% endif %}{% endblock %}
+{% block crumbs %}sentinelops<span class="sep">/</span><a href="{{ url_for('incidents.list_incidents') }}">incidents</a><span class="sep">/</span>{{ incident.id if incident else "new" }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-lg-8">
+    <form class="panel" method="post" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="panel-head">
+        <h2>{{ "Edit incident" if incident else "New incident" }}</h2>
+        {% if incident %}{{ ui.status(incident.status) }}{% endif %}
+      </div>
+      <div class="panel-body">
+        {{ ui.field(form.title, placeholder="What broke, in one line") }}
+        <div class="row g-3">
+          <div class="col-12 col-md-4">{{ ui.field(form.service_id) }}</div>
+          <div class="col-12 col-md-4">{{ ui.field(form.severity) }}</div>
+          <div class="col-12 col-md-4">{{ ui.field(form.deployment_id, mono=true) }}</div>
+        </div>
+        {{ ui.field(form.root_cause, hint="What failed, why, and what was changed so it does not happen again.", placeholder="Fill this in once the cause is known") }}
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" type="submit">{{ "Save changes" if incident else "Open incident" }}</button>
+          <a class="btn btn-secondary" href="{{ url_for('incidents.list_incidents') }}">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if incident %}
+  <div class="col-12 col-lg-4">
+    <div class="panel">
+      <div class="panel-head"><h2>Timeline</h2></div>
+      <dl class="kv" style="grid-template-columns: 100px 1fr">
+        <dt>Opened</dt>
+        <dd>{{ incident.created_at|fulldate }}</dd>
+        <dt>Resolved</dt>
+        <dd>{% if incident.resolved_at %}{{ incident.resolved_at|fulldate }}{% else %}<span class="muted">still open</span>{% endif %}</dd>
+        <dt>Time open</dt>
+        <dd class="mono">{{ (time_open_until - incident.created_at).total_seconds()|duration }}</dd>
+        <dt>Deployment</dt>
+        <dd>
+          {% if incident.deployment %}<a class="mono link" href="{{ url_for('deployments.detail', deployment_id=incident.deployment.id) }}">{{ incident.deployment.short_hash }}</a>
+          {% else %}<span class="muted">none</span>{% endif %}
+        </dd>
+      </dl>
+      {% if incident.status == "OPEN" %}
+      <div class="panel-body" style="border-top: 1px solid var(--border)">
+        <form method="post" action="{{ url_for('incidents.resolve', incident_id=incident.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-secondary w-100" type="submit">Mark resolved</button>
+        </form>
+        <div class="form-hint">Save the root cause first. Unsaved changes in the form are lost.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

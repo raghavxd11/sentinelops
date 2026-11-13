@@ -1,0 +1,104 @@
+{% extends "shell.html" %}
+{% block title %}Deployment {{ deployment.short_hash }}{% endblock %}
+{% block heading %}Deployment <span class="mono">{{ deployment.short_hash }}</span>{% endblock %}
+{% block crumbs %}sentinelops<span class="sep">/</span><a href="{{ url_for('deployments.list_deployments') }}">deployments</a><span class="sep">/</span>{{ deployment.id }}{% endblock %}
+
+{% block content %}
+{% set icons = {"passed": "bi-check-lg", "failed": "bi-x-lg", "skipped": "bi-dash", "running": "bi-three-dots", "unknown": "bi-question"} %}
+{% set state_labels = {"passed": "passed", "failed": "failed", "skipped": "not run", "running": "running", "unknown": "not reported"} %}
+<div class="detail-head">
+  <div>
+    {{ ui.status(deployment.status) }}
+    <h2>{{ deployment.commit_message or "No commit message" }}</h2>
+    <div class="meta">
+      {{ deployment.service.name }}, build <span class="mono">#{{ deployment.build_number if deployment.build_number is not none else "-" }}</span>,
+      reported {{ ui.when(deployment.created_at) }}
+    </div>
+  </div>
+  {% if not deployment.incidents %}
+  <a class="btn btn-secondary" href="{{ url_for('incidents.create', deployment=deployment.id) }}">Open incident</a>
+  {% endif %}
+</div>
+
+{% if deployment.status == "ROLLED_BACK" %}
+<p class="note mb-3">
+  {% if previous_stable %}
+  Rolled back to <a class="mono link" href="{{ url_for('deployments.detail', deployment_id=previous_stable.id) }}">{{ previous_stable.short_hash }}</a>
+  (build #{{ previous_stable.build_number }}) after the health check failed.
+  {% else %}
+  Rolled back to the previous stable image after the health check failed.
+  {% endif %}
+</p>
+{% elif deployment.status == "FAILED" and deployment.failed_stage %}
+<p class="note fail mb-3">Pipeline stopped at the {{ deployment.failed_stage }} stage. Nothing was deployed, so the running version was not affected.</p>
+{% endif %}
+
+<div class="panel mb-3">
+  <div class="panel-head">
+    <h2>Pipeline</h2>
+    <span class="sub">{{ deployment.duration_seconds|duration }} total</span>
+  </div>
+  <div class="panel-body">
+    <ol class="pipeline">
+      {% for name, state in stages %}
+      {% set is_rollback = name == "Rollback" %}
+      <li class="stage-{{ 'rollback' if is_rollback else state }}">
+        <span class="node"><i class="bi {{ 'bi-arrow-counterclockwise' if is_rollback else icons[state] }}"></i></span>
+        <span class="name">{{ name }}</span>
+        <span class="state">{{ "done" if is_rollback else state_labels[state] }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <div class="panel">
+      <div class="panel-head"><h2>Trace</h2></div>
+      <dl class="kv">
+        <dt>Commit</dt>
+        <dd>{{ ui.copyable(deployment.commit_hash) }}</dd>
+        <dt>Author</dt>
+        <dd>{{ ui.author(deployment.commit_author) }}</dd>
+        <dt>Branch</dt>
+        <dd class="mono">{{ deployment.branch or "-" }}</dd>
+        <dt>Jenkins build</dt>
+        <dd class="mono">{% if deployment.build_number is not none %}#{{ deployment.build_number }}{% else %}-{% endif %}</dd>
+        <dt>Image tag</dt>
+        <dd>{% if deployment.image_tag %}{{ ui.copyable(deployment.image_tag) }}{% else %}-{% endif %}</dd>
+        <dt>Service</dt>
+        <dd><a class="link" href="{{ url_for('deployments.list_deployments', q=deployment.service.name) }}">{{ deployment.service.name }}</a></dd>
+        <dt>Duration</dt>
+        <dd class="mono">{{ deployment.duration_seconds|duration }}</dd>
+        <dt>Committed</dt>
+        <dd>{% if deployment.committed_at %}{{ deployment.committed_at|fulldate }}{% else %}<span class="muted">not reported</span>{% endif %}</dd>
+        <dt>Reported</dt>
+        <dd>{{ deployment.created_at|fulldate }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="panel">
+      <div class="panel-head"><h2>Linked incident</h2></div>
+      {% if deployment.incidents %}
+      <ul class="incident-list">
+        {% for incident in deployment.incidents %}
+        <li>
+          {{ ui.severity(incident.severity) }} {{ ui.status(incident.status) }}
+          <a class="title" href="{{ url_for('incidents.edit', incident_id=incident.id) }}">#{{ incident.id }} {{ incident.title }}</a>
+          <span class="cell-sub">
+            opened {{ ui.when(incident.created_at) }}{% if incident.resolved_at %}, resolved in {{ (incident.resolved_at - incident.created_at).total_seconds()|duration }}{% endif %}
+          </span>
+          {% if incident.root_cause %}<p class="text-2 mt-2 mb-0" style="font-size: 13px">{{ incident.root_cause }}</p>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty"><p class="mb-0">No incident is linked to this deployment.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

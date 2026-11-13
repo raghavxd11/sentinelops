@@ -1,0 +1,173 @@
+{% extends "shell.html" %}
+{% block title %}Overview{% endblock %}
+{% block crumbs %}sentinelops<span class="sep">/</span>overview{% endblock %}
+
+{% block content %}
+{% set week = stats.last_7_days %}
+{% set before = stats.previous_7_days %}
+
+{# Row 1: headline numbers #}
+<div class="row g-3">
+  <div class="col-6 col-xl-3">
+    <div class="panel kpi">
+      <div class="kpi-label">Total deployments</div>
+      <div class="kpi-value">{{ stats.total_deployments }}</div>
+      <div class="kpi-trend">{{ week.deployments }} in the last 7 days, {{ before.deployments }} the week before</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="panel kpi">
+      <div class="kpi-label">Success rate</div>
+      <div class="kpi-value">{% if stats.success_rate is not none %}{{ stats.success_rate }}%{% else %}-{% endif %}</div>
+      <div class="kpi-trend">
+        {% if week.success_rate is not none %}{{ week.success_rate }}% in the last 7 days{% if before.success_rate is not none %}, {{ before.success_rate }}% the week before{% endif %}
+        {% else %}No finished deployments in the last 7 days{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="panel kpi">
+      <div class="kpi-label">Rollbacks</div>
+      <div class="kpi-value">{{ stats.rollbacks }}</div>
+      <div class="kpi-trend">{{ week.rollbacks }} in the last 7 days, {{ stats.failed }} failed before deploy</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="panel kpi">
+      <div class="kpi-label">Open incidents</div>
+      <div class="kpi-value">{{ stats.open_incidents }}</div>
+      <div class="kpi-trend">{% if stats.open_incidents %}{{ stats.open_incidents_high }} high or critical{% else %}Nothing needs attention{% endif %}</div>
+    </div>
+  </div>
+</div>
+
+{# Row 2: DevOps metrics #}
+<div class="row g-3 mt-0">
+  <div class="col-12 col-md-4">
+    <div class="panel kpi small">
+      <div class="kpi-label">Deployment frequency</div>
+      <div class="kpi-value">{{ stats.deployment_frequency_per_day }}<span class="unit">per day</span></div>
+      <div class="kpi-trend">Average over the last 7 days</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="panel kpi small">
+      <div class="kpi-label">Mean time to recovery</div>
+      <div class="kpi-value">{{ stats.mttr_seconds|duration }}</div>
+      <div class="kpi-trend">Incident opened to resolved, {{ stats.resolved_incidents }} resolved</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="panel kpi small">
+      <div class="kpi-label">Lead time</div>
+      <div class="kpi-value">{{ stats.lead_time_seconds|duration }}</div>
+      <div class="kpi-trend">Commit to successful deploy, {{ stats.lead_time_samples }} deployments</div>
+    </div>
+  </div>
+</div>
+
+{% if stats.total_deployments == 0 %}
+<div class="panel mt-3">
+  <div class="empty">
+    <p>No deployments recorded yet. Jenkins reports them to <span class="mono">POST /api/deployments</span>.</p>
+    <a class="btn btn-secondary" href="{{ url_for('main.api_docs') }}">Open API docs</a>
+  </div>
+</div>
+{% else %}
+
+{# Row 3: charts #}
+<div class="row g-3 mt-0">
+  <div class="col-12 col-lg-8">
+    <div class="panel h-100">
+      <div class="panel-head">
+        <h2>Deployments per day</h2>
+        <span class="sub">Last 14 days, by status (UTC)</span>
+      </div>
+      <div class="panel-body">
+        <div class="chart-box"><canvas id="perDayChart" role="img" aria-label="Stacked bar chart of deployments per day by status for the last 14 days"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="panel h-100">
+      <div class="panel-head">
+        <h2>Status breakdown</h2>
+        <span class="sub">All time</span>
+      </div>
+      <div class="panel-body">
+        <div class="chart-box donut"><canvas id="breakdownChart" role="img" aria-label="Doughnut chart of deployments by status"></canvas></div>
+        <ul class="legend-list">
+          {% for key, color in [("SUCCESS", "--ok"), ("FAILED", "--fail"), ("ROLLED_BACK", "--warn"), ("IN_PROGRESS", "--info")] %}
+          <li>
+            <span class="swatch" style="background: var({{ color }})"></span>
+            <a href="{{ url_for('deployments.list_deployments', status=key) }}">{{ key|status_label }}</a>
+            <span class="n">{{ stats.status_breakdown[key] }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Row 4: recent deployments + open incidents #}
+<div class="row g-3 mt-0">
+  <div class="col-12 col-lg-8">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Recent deployments</h2>
+        <a class="small-12 link" href="{{ url_for('deployments.list_deployments') }}">View all {{ stats.total_deployments }}</a>
+      </div>
+      <div class="table-wrap">
+        <table class="table-ops">
+          <thead>
+            <tr><th>Status</th><th>Service</th><th>Commit</th><th>Message</th><th>Build</th><th>When</th></tr>
+          </thead>
+          <tbody>
+            {% for d in recent %}
+            <tr>
+              <td>{{ ui.status(d.status) }}</td>
+              <td class="nowrap">{{ d.service.name }}</td>
+              <td><a class="mono" href="{{ url_for('deployments.detail', deployment_id=d.id) }}">{{ d.short_hash }}</a></td>
+              <td><div class="truncate narrow" title="{{ d.commit_message }}">{{ d.commit_message }}</div></td>
+              <td class="mono nowrap">#{{ d.build_number }}</td>
+              <td class="nowrap text-2">{{ ui.when(d.created_at) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Open incidents</h2>
+        <a class="small-12 link" href="{{ url_for('incidents.list_incidents') }}">View all</a>
+      </div>
+      {% if open_incidents %}
+      <ul class="incident-list">
+        {% for incident in open_incidents %}
+        <li>
+          {{ ui.severity(incident.severity) }}
+          <a class="title" href="{{ url_for('incidents.edit', incident_id=incident.id) }}">{{ incident.title }}</a>
+          <span class="cell-sub">{{ incident.service.name }}, opened {{ ui.when(incident.created_at) }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty"><p class="mb-0">No open incidents.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if stats.total_deployments %}
+<script id="chart-data" type="application/json">{{ chart_data|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endif %}
+{% endblock %}

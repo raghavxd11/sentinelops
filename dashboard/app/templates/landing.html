@@ -1,0 +1,74 @@
+{# Public page for logged-out visitors. Written like documentation, not marketing. #}
+{% extends "base.html" %}
+{% block title %}Self-healing CI/CD{% endblock %}
+
+{% block body %}
+<header class="public-bar">
+  {{ ui.brand(url_for('main.landing')) }}
+  <div class="right">
+    <button class="icon-btn" type="button" data-theme-toggle title="Switch light / dark" aria-label="Switch light / dark theme"><i class="bi bi-circle-half"></i></button>
+    <a class="btn btn-secondary" href="{{ url_for('auth.login') }}">Sign in</a>
+  </div>
+</header>
+
+<main class="doc">
+  <h1>sentinelops</h1>
+  <p class="lede">Self-healing CI/CD for containerized apps on AWS.</p>
+  <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Sign in</a>
+  <a class="link ms-3" href="{{ url_for('auth.register') }}">Create an account</a>
+
+  <h2>Sample pipeline run: a deploy that fails its health check</h2>
+<pre class="code" aria-label="Sample pipeline log"><span class="c-dim">$ git push origin main</span>
+<span class="c-dim">14:02:11</span>  checkout      7c1e4b9 "feat: read greeting from GREETING env var" (main)
+<span class="c-dim">14:02:14</span>  lint          flake8: 0 errors
+<span class="c-dim">14:02:31</span>  test          <span class="c-ok">12 passed</span> in 1.84s
+<span class="c-dim">14:02:38</span>  trivy fs      0 HIGH, 0 CRITICAL
+<span class="c-dim">14:03:20</span>  build         demo-app:7c1e4b9
+<span class="c-dim">14:03:41</span>  trivy image   0 HIGH, 0 CRITICAL
+<span class="c-dim">14:03:58</span>  push          ecr/demo-app:7c1e4b9
+<span class="c-dim">14:04:06</span>  deploy        production, port 8000
+<span class="c-dim">14:04:09</span>  health        GET /health 500 (1/5)
+<span class="c-dim">14:04:40</span>  health        GET /health 500 (5/5) <span class="c-fail">failed</span>
+<span class="c-dim">14:04:41</span>  rollback      <span class="c-warn">redeploying demo-app:a3f9c21 (latest-stable)</span>
+<span class="c-dim">14:04:52</span>  health        GET /health 200 <span class="c-ok">ok</span>
+<span class="c-dim">14:04:53</span>  report        ROLLED_BACK, build #48, 162s
+<span class="c-dim">14:04:53</span>  incident      opened: health check failed on demo-app, build #48 rolled back</pre>
+
+  <h2>Pipeline stages</h2>
+  <div class="flow">
+    <span class="box">checkout</span><span class="line"></span>
+    <span class="box">lint + test + scan</span><span class="line"></span>
+    <span class="box">build</span><span class="line"></span>
+    <span class="box">image scan</span><span class="line"></span>
+    <span class="box">push to ECR</span><span class="line"></span>
+    <span class="box">deploy</span><span class="line"></span>
+    <span class="box">health check</span>
+  </div>
+  <div class="flow-branches">
+    <div class="flow">
+      <span class="tag">pass</span>
+      <span class="box ok">tag latest-stable</span><span class="line"></span>
+      <span class="box">report SUCCESS</span>
+    </div>
+    <div class="flow">
+      <span class="tag">fail</span>
+      <span class="box warn">roll back to latest-stable</span><span class="line"></span>
+      <span class="box">report ROLLED_BACK</span><span class="line"></span>
+      <span class="box fail">open incident</span>
+    </div>
+  </div>
+
+  <h2>How it works</h2>
+  <ol>
+    <li><strong>Every push runs the pipeline.</strong> Jenkins lints, tests and scans the code, then builds an image tagged with the commit SHA.</li>
+    <li><strong>Trivy gates the build.</strong> A HIGH or CRITICAL finding with a fix available stops the image before it is pushed.</li>
+    <li><strong>Deploys are health-checked.</strong> If <span class="mono">/health</span> fails 5 times, the last stable image is redeployed automatically.</li>
+    <li><strong>Every deployment is recorded here.</strong> Commit, author, build number, image tag, status and duration, with an incident opened for each failure.</li>
+  </ol>
+
+  <h2>Stack</h2>
+  <p class="stack mb-0">Git · Jenkins · Docker · Trivy · Terraform · AWS (EC2, ECR, CloudWatch, SNS)</p>
+
+  <footer>SentinelOps is a DevOps course project. Source: <a class="link" href="https://github.com/raghavxd11/sentinelops">github.com/raghavxd11/sentinelops</a></footer>
+</main>
+{% endblock %}
