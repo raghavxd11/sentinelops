@@ -96,3 +96,20 @@ def test_logout(auth_client):
 
 def test_logout_must_be_post(auth_client):
     assert auth_client.get("/logout").status_code == 405
+
+
+def test_usernames_are_not_case_sensitive(client, user):
+    taken = client.post(
+        "/register",
+        data={
+            "username": user.username.upper(),
+            "email": "other@example.com",
+            "password": PASSWORD,
+            "confirm": PASSWORD,
+        },
+    )
+    assert b"That username is taken." in taken.data
+    assert User.query.count() == 1
+
+    login = client.post("/login", data={"username": user.username.upper(), "password": PASSWORD})
+    assert login.status_code == 302

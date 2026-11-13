@@ -43,7 +43,7 @@ class RegisterForm(FlaskForm):
     )
 
     def validate_username(self, field):
-        if User.query.filter_by(username=field.data).first():
+        if User.find_by_username(field.data):
             raise ValidationError("That username is taken.")
 
     def validate_email(self, field):
