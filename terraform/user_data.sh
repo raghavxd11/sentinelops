@@ -6,6 +6,8 @@
 # variables in this file are therefore written as plain $NAME, without braces.
 #
 # Progress and errors: /var/log/user-data.log  (sudo tail -f /var/log/user-data.log)
+
+# shellcheck disable=SC2154  # the dollar-brace placeholders are Terraform's, not bash variables
 set -euxo pipefail
 exec > >(tee -a /var/log/user-data.log) 2>&1
 
