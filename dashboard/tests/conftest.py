@@ -1,10 +1,18 @@
-"""Shared pytest fixtures. Every test gets a fresh in-memory SQLite database."""
+"""Shared pytest fixtures. Every test gets a fresh, empty database.
+
+By default that is in-memory SQLite. To run the same tests against MySQL, set
+TEST_DATABASE_URL to an empty database that is used only for tests (every
+table in it is dropped after each test).
+"""
+import os
+
 import pytest
 
 from app import create_app
 from app.extensions import db
 from app.models import Service, User
 
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite://")
 API_TOKEN = "test-token"
 PASSWORD = "correct-horse-battery"
 
@@ -15,7 +23,7 @@ def app():
         {
             "TESTING": True,
             "SECRET_KEY": "test-secret",
-            "SQLALCHEMY_DATABASE_URI": "sqlite://",
+            "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL,
             "WTF_CSRF_ENABLED": False,  # CSRF itself is tested in test_security.py
             "API_TOKEN": API_TOKEN,
         }
