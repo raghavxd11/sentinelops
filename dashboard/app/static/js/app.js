@@ -29,6 +29,9 @@
     button.addEventListener('click', function () { toggleSidebar(true); });
   });
   if (backdrop) backdrop.addEventListener('click', function () { toggleSidebar(false); });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') toggleSidebar(false);
+  });
 
   // ----- flash messages as toasts -----
   document.querySelectorAll('.toast').forEach(function (el) {

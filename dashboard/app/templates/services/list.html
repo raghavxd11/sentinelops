@@ -51,7 +51,7 @@
                     data-bs-toggle="modal" data-bs-target="#confirmModal"
                     data-action="{{ url_for('services.delete', service_id=service.id) }}"
                     data-title="Delete {{ service.name }}?"
-                    data-text="This also deletes its {{ service.deploy_count }} deployments and their incidents. It cannot be undone."><i class="bi bi-trash3"></i></button>
+                    data-text="This also deletes its {{ service.deploy_count }} deployment{{ '' if service.deploy_count == 1 else 's' }} and all its incidents. It cannot be undone."><i class="bi bi-trash3"></i></button>
           </td>
         </tr>
         {% endfor %}
