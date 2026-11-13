@@ -11,6 +11,8 @@ from ..models import DEPLOYMENT_STATUSES, STAGES, Deployment, Service, open_inci
 
 bp = Blueprint("api", __name__)
 
+MAX_INT = 2_147_483_647  # largest value a MySQL INT column holds
+
 
 def token_is_valid():
     """Compare the X-API-Token header with API_TOKEN in constant time.
@@ -31,6 +33,18 @@ def parse_timestamp(value):
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
     return parsed
+
+
+def parse_count(value):
+    """Optional whole number that fits a MySQL INT column. Raises ValueError otherwise."""
+    if value is None:
+        return None
+    if isinstance(value, bool):  # int(True) == 1, which would hide a mistake in the report
+        raise ValueError("not a number")
+    number = int(value)
+    if not 0 <= number <= MAX_INT:
+        raise ValueError("out of range")
+    return number
 
 
 def error(message, code):
@@ -66,7 +80,8 @@ def list_deployments():
     if service:
         query = query.filter(Service.name == service)
 
-    limit = min(request.args.get("limit", 50, type=int), 200)
+    # Between 1 and 200. MySQL rejects a negative LIMIT.
+    limit = max(1, min(request.args.get("limit", 50, type=int), 200))
     deployments = query.order_by(*Deployment.newest_first()).limit(limit).all()
     return jsonify([d.to_dict() for d in deployments])
 
@@ -84,6 +99,8 @@ def report_deployment():
     for field in ("service", "commit_hash", "status"):
         if not data.get(field):
             return error(f"'{field}' is required", 400)
+        if not isinstance(data[field], str):
+            return error(f"'{field}' must be a string", 400)
 
     status = data["status"]
     if status not in DEPLOYMENT_STATUSES:
@@ -94,14 +111,13 @@ def report_deployment():
         return error(f"failed_stage must be one of {STAGES}", 400)
 
     try:
-        build_number = int(data["build_number"]) if data.get("build_number") is not None else None
-        duration = (
-            int(data["duration_seconds"]) if data.get("duration_seconds") is not None else None
-        )
+        build_number = parse_count(data.get("build_number"))
+        duration = parse_count(data.get("duration_seconds"))
         committed_at = parse_timestamp(data["committed_at"]) if data.get("committed_at") else None
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return error(
-            "build_number and duration_seconds must be integers, committed_at must be ISO 8601",
+            "build_number and duration_seconds must be whole numbers from 0 to 2147483647, "
+            "committed_at must be ISO 8601",
             400,
         )
 
@@ -122,7 +138,7 @@ def report_deployment():
         deployment = Deployment(service=service)
         db.session.add(deployment)
 
-    commit_hash = str(data["commit_hash"])[:40]
+    commit_hash = data["commit_hash"][:40]
     deployment.commit_hash = commit_hash
     deployment.commit_author = str(data.get("commit_author") or "")[:120]
     deployment.commit_message = str(data.get("commit_message") or "")[:500]

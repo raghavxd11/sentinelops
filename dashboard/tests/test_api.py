@@ -1,4 +1,6 @@
 """REST API: token check, validation, auto-incident logic."""
+import pytest
+
 from app.models import Deployment, Incident
 from tests.conftest import API_TOKEN
 
@@ -118,3 +120,40 @@ def test_unknown_api_path_returns_json_404(client):
     response = client.get("/api/nope")
     assert response.status_code == 404
     assert response.get_json() == {"error": "Not found"}
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"service": {"name": "demo-app"}},
+        {"commit_hash": 1234567},
+        {"build_number": 99999999999},  # does not fit a MySQL INT column
+        {"build_number": -1},
+        {"build_number": True},
+        {"duration_seconds": -5},
+        {"committed_at": "0001-01-01T00:00:00+05:30"},  # before year 1 once converted to UTC
+    ],
+)
+def test_post_with_invalid_values_is_a_400_not_a_500(report, overrides):
+    response = report(**overrides)
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+    assert Deployment.query.count() == 0
+
+
+def test_post_keeps_unicode_and_does_not_need_optional_fields(client, service):
+    payload = dict(PAYLOAD, commit_author="Zoë Ünïcode", commit_message="fix: ship it 🚀")
+    response = client.post("/api/deployments", json=payload, headers={"X-API-Token": API_TOKEN})
+    assert response.status_code == 201
+    deployment = Deployment.query.one()
+    assert deployment.commit_message == "fix: ship it 🚀"
+    assert deployment.build_number is None
+
+
+@pytest.mark.parametrize("limit, expected", [("-1", 1), ("0", 1), ("1", 1), ("abc", 2), ("999", 2)])
+def test_get_deployments_limit_is_clamped(client, report, limit, expected):
+    report(commit_hash="a" * 40, build_number=1)
+    report(commit_hash="b" * 40, build_number=2)
+    response = client.get(f"/api/deployments?limit={limit}")
+    assert response.status_code == 200
+    assert len(response.get_json()) == expected
