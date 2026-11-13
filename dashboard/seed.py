@@ -38,7 +38,8 @@ SERVICES = [
     },
 ]
 
-AUTHORS = ["Raghav Pandey", "Raghav Pandey", "Raghav Pandey", "Ananya Sharma", "Karan Mehta"]
+# Every seeded commit is attributed to the repo owner. No invented people.
+AUTHOR = "Raghav Pandey"
 
 SUCCESS_MESSAGES = [
     "feat: show git commit on the index page",
@@ -232,7 +233,7 @@ def seed():
         deployment = Deployment(
             service=services[spec["name"]],
             commit_hash=commit_hash,
-            commit_author=rng.choice(AUTHORS),
+            commit_author=AUTHOR,
             commit_message=message,
             branch=spec["branch"],
             build_number=build_numbers[spec["name"]],
@@ -256,7 +257,7 @@ def seed():
         Deployment(
             service=services[staging["name"]],
             commit_hash=commit_hash,
-            commit_author="Raghav Pandey",
+            commit_author=AUTHOR,
             commit_message="feat: report deployment to dashboard from Jenkins",
             branch=staging["branch"],
             build_number=build_numbers[staging["name"]],

@@ -43,6 +43,12 @@ def test_seed_marks_every_row_and_creates_login(app):
     assert User.query.filter_by(username="admin").count() == 1
 
 
+def test_seed_uses_only_the_repo_owner_as_author(app):
+    seed.seed()
+    authors = {deployment.commit_author for deployment in Deployment.query}
+    assert authors == {"Raghav Pandey"}
+
+
 def test_seed_twice_does_not_duplicate(app):
     seed.seed()
     first = Deployment.query.count()
