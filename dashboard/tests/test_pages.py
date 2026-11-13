@@ -1,5 +1,8 @@
 """Every logged-in page renders, with and without data, and seed.py behaves."""
 import seed
+from flask import g
+from sqlalchemy.exc import OperationalError
+
 from app.extensions import db
 from app.models import Deployment, Incident, Service, User
 
@@ -81,3 +84,19 @@ def test_clear_unlinks_real_incident_from_seeded_deployment(app):
     kept = Incident.query.one()
     assert kept.title == "raised by hand"
     assert kept.deployment_id is None
+
+
+def test_error_page_renders_for_a_signed_in_user_when_the_database_is_down(
+    app, auth_client, monkeypatch
+):
+    def database_is_down(*args, **kwargs):
+        raise OperationalError("SELECT 1", {}, Exception("connection refused"))
+
+    app.config["PROPAGATE_EXCEPTIONS"] = False  # let the 500 handler run, as in production
+    monkeypatch.setattr(db.session, "get", database_is_down)
+    g.pop("_login_user", None)  # forget the cached user so the next request loads it again
+
+    response = auth_client.get("/overview")
+    assert response.status_code == 500
+    assert b"Internal server error" in response.data
+    assert b"sentinelops" in response.data  # the styled page, not the plain fallback

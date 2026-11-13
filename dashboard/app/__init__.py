@@ -1,6 +1,7 @@
 """Application factory: builds and configures the Flask app."""
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, g, jsonify, render_template, request
 from flask_wtf.csrf import CSRFError
+from sqlalchemy.exc import SQLAlchemyError
 
 from .config import Config
 from .extensions import csrf, db, login_manager
@@ -58,13 +59,22 @@ def create_app(test_config=None):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    try:
+        return db.session.get(User, int(user_id))
+    except SQLAlchemyError:
+        db.session.rollback()
+        # Database is down. The error page must still render, so while it is
+        # being rendered the visitor is treated as signed out (see error_response).
+        if g.get("rendering_error_page"):
+            return None
+        raise
 
 
 def register_error_handlers(app):
     def error_response(code, title, detail):
         if request.path.startswith("/api/"):
             return jsonify({"error": title}), code
+        g.rendering_error_page = True
         return render_template("error.html", code=code, title=title, detail=detail), code
 
     @app.errorhandler(404)
