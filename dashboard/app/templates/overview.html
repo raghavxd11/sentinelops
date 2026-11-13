@@ -130,7 +130,7 @@
               <td class="nowrap">{{ d.service.name }}</td>
               <td><a class="mono" href="{{ url_for('deployments.detail', deployment_id=d.id) }}">{{ d.short_hash }}</a></td>
               <td><div class="truncate narrow" title="{{ d.commit_message }}">{{ d.commit_message }}</div></td>
-              <td class="mono nowrap">#{{ d.build_number }}</td>
+              <td class="mono nowrap">{{ d.build_label }}</td>
               <td class="nowrap text-2">{{ ui.when(d.created_at) }}</td>
             </tr>
             {% endfor %}

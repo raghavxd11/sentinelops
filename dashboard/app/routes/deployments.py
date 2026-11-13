@@ -20,15 +20,16 @@ def list_deployments():
 
     query = Deployment.query.join(Service)
     if search:
-        pattern = f"%{search}%"
+        # autoescape: a "%" or "_" typed by the user is searched for literally,
+        # not treated as a SQL wildcard.
         query = query.filter(
             or_(
-                Deployment.commit_hash.like(f"{search}%"),
-                Deployment.commit_message.ilike(pattern),
-                Deployment.commit_author.ilike(pattern),
-                Deployment.image_tag.ilike(pattern),
-                Deployment.branch.ilike(pattern),
-                Service.name.ilike(pattern),
+                Deployment.commit_hash.istartswith(search, autoescape=True),
+                Deployment.commit_message.icontains(search, autoescape=True),
+                Deployment.commit_author.icontains(search, autoescape=True),
+                Deployment.image_tag.icontains(search, autoescape=True),
+                Deployment.branch.icontains(search, autoescape=True),
+                Service.name.icontains(search, autoescape=True),
             )
         )
 
@@ -41,9 +42,11 @@ def list_deployments():
     else:
         status = ""
 
-    pagination = query.order_by(*Deployment.newest_first()).paginate(
-        page=page, per_page=PER_PAGE, error_out=False
-    )
+    query = query.order_by(*Deployment.newest_first())
+    pagination = query.paginate(page=page, per_page=PER_PAGE, error_out=False)
+    if not pagination.items and pagination.total:
+        # A page number past the end (old bookmark, edited URL): show the last page.
+        pagination = query.paginate(page=pagination.pages, per_page=PER_PAGE, error_out=False)
     return render_template(
         "deployments/list.html",
         pagination=pagination,

@@ -29,6 +29,15 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 
+    @staticmethod
+    def find_by_username(username):
+        """Usernames are not case sensitive: 'Raghav' and 'raghav' are the same account.
+
+        MySQL compares text that way by default and SQLite does not, so the
+        comparison is written out to behave the same on both.
+        """
+        return User.query.filter(db.func.lower(User.username) == username.lower()).first()
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -104,6 +113,11 @@ class Deployment(db.Model):
     @property
     def short_hash(self):
         return self.commit_hash[:7]
+
+    @property
+    def build_label(self):
+        """'#48', or '-' when the pipeline did not report a build number."""
+        return f"#{self.build_number}" if self.build_number is not None else "-"
 
     def previous_stable(self):
         """Last successful deployment of the same service before this one."""

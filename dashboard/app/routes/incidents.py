@@ -22,7 +22,7 @@ def build_form(incident=None):
     if incident and incident.deployment and incident.deployment not in recent:
         recent.append(incident.deployment)
     form.deployment_id.choices = [SelectChoice(0, "None")] + [
-        SelectChoice(d.id, f"{d.short_hash}  {d.service.name}  build #{d.build_number}  {d.status}")
+        SelectChoice(d.id, f"{d.short_hash}  {d.service.name}  build {d.build_label}  {d.status}")
         for d in recent
     ]
     return form

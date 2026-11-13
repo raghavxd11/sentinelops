@@ -11,7 +11,8 @@
     {{ ui.status(deployment.status) }}
     <h2>{{ deployment.commit_message or "No commit message" }}</h2>
     <div class="meta">
-      {{ deployment.service.name }}, build <span class="mono">#{{ deployment.build_number if deployment.build_number is not none else "-" }}</span>,
+      {{ deployment.service.name }},
+      {% if deployment.build_number is not none %}build <span class="mono">{{ deployment.build_label }}</span>,{% endif %}
       reported {{ ui.when(deployment.created_at) }}
     </div>
   </div>
@@ -24,7 +25,7 @@
 <p class="note mb-3">
   {% if previous_stable %}
   Rolled back to <a class="mono link" href="{{ url_for('deployments.detail', deployment_id=previous_stable.id) }}">{{ previous_stable.short_hash }}</a>
-  (build #{{ previous_stable.build_number }}) after the health check failed.
+  {% if previous_stable.build_number is not none %}(build {{ previous_stable.build_label }}){% endif %} after the health check failed.
   {% else %}
   Rolled back to the previous stable image after the health check failed.
   {% endif %}
@@ -33,12 +34,14 @@
 <p class="note info mb-3">Build is running. Jenkins reports the result when the build finishes, not the active stage, so every stage shows as pending until then.</p>
 {% elif deployment.status == "FAILED" and deployment.failed_stage %}
 <p class="note fail mb-3">Pipeline stopped at the {{ deployment.failed_stage }} stage. Nothing was deployed, so the running version was not affected.</p>
+{% elif deployment.status == "FAILED" %}
+<p class="note fail mb-3">The pipeline failed, but Jenkins did not report which stage, so the timeline below is not filled in.</p>
 {% endif %}
 
 <div class="panel mb-3">
   <div class="panel-head">
     <h2>Pipeline</h2>
-    {% if deployment.status != "IN_PROGRESS" %}<span class="sub">{{ deployment.duration_seconds|duration }} total</span>{% endif %}
+    {% if deployment.status != "IN_PROGRESS" and deployment.duration_seconds is not none %}<span class="sub">{{ deployment.duration_seconds|duration }} total</span>{% endif %}
   </div>
   <div class="panel-body">
     <ol class="pipeline">
@@ -66,7 +69,7 @@
         <dt>Branch</dt>
         <dd class="mono">{{ deployment.branch or "-" }}</dd>
         <dt>Jenkins build</dt>
-        <dd class="mono">{% if deployment.build_number is not none %}#{{ deployment.build_number }}{% else %}-{% endif %}</dd>
+        <dd class="mono">{{ deployment.build_label }}</dd>
         <dt>Image tag</dt>
         <dd>{% if deployment.image_tag %}{{ ui.copyable(deployment.image_tag) }}{% else %}-{% endif %}</dd>
         <dt>Service</dt>

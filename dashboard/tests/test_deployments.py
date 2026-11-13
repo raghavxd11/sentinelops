@@ -120,3 +120,27 @@ def test_previous_stable_works_for_same_second_deployments(service):
     first, second = same_second_pair(service)
     assert second.previous_stable() == first
     assert first.previous_stable() is None
+
+
+def test_missing_build_number_is_shown_as_a_dash_not_none(auth_client, report):
+    deployment_id = report(build_number=None, status="FAILED").get_json()["id"]
+    for path in ("/overview", "/deployments", f"/deployments/{deployment_id}", "/incidents/new"):
+        page = auth_client.get(path).data
+        assert b"#None" not in page, path
+    assert b"did not report which stage" in auth_client.get(f"/deployments/{deployment_id}").data
+
+
+def test_search_treats_percent_and_underscore_literally(auth_client, report):
+    report(commit_hash="a" * 40, commit_message="fix: retry 100% of failed pushes", build_number=1)
+    report(commit_hash="b" * 40, commit_message="docs: update readme", build_number=2)
+
+    by_percent = auth_client.get("/deployments?q=%25").data
+    assert b"aaaaaaa" in by_percent and b"bbbbbbb" not in by_percent
+    assert b"No deployments match" in auth_client.get("/deployments?q=_").data
+
+
+def test_page_past_the_end_shows_the_last_page(auth_client, report):
+    report()
+    page = auth_client.get("/deployments?page=999").data
+    assert b"7c1e4b9" in page
+    assert b"No deployments recorded yet" not in page

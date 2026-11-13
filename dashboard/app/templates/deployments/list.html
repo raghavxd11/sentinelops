@@ -37,7 +37,7 @@
           </td>
           <td><div class="truncate" title="{{ d.commit_message }}">{{ d.commit_message }}</div></td>
           <td>{{ ui.author(d.commit_author) }}</td>
-          <td class="mono nowrap">{% if d.build_number is not none %}#{{ d.build_number }}{% else %}-{% endif %}</td>
+          <td class="mono nowrap">{{ d.build_label }}</td>
           <td>{{ ui.copyable(d.image_tag) }}</td>
           <td class="num nowrap">{{ d.duration_seconds|duration }}</td>
           <td class="nowrap text-2">{{ ui.when(d.created_at) }}</td>
