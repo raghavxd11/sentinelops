@@ -1,32 +1,65 @@
 # secrets and local config
 .env
+.env.*
+!.env.example
 *.pem
 *.key
+*.ppk
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+.aws/
+credentials.json
 
 # python
 .venv/
+venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+build/
+dist/
 .pytest_cache/
 .coverage
+.coverage.*
 coverage.xml
 htmlcov/
 test-results/
+.mypy_cache/
+.ruff_cache/
 
 # local sqlite database (Flask instance folder)
 instance/
 *.db
+*.sqlite3
 
-# terraform
+# terraform: state holds resource IDs and can hold secrets; plans too.
+# .terraform.lock.hcl is committed on purpose (pins provider versions).
 .terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars
+*.tfvars.json
 !*.tfvars.example
+*.tfplan
+tfplan
 crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# pipeline output (Trivy reports, JUnit XML) when run locally
+reports/
+*.log
 
 # editors / OS
 .vscode/
 .idea/
+*.swp
+*~
 Thumbs.db
 .DS_Store
+desktop.ini
