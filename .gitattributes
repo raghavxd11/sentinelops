@@ -1,0 +1,21 @@
+# Let git decide what is text, and store text with LF in the repository.
+* text=auto
+
+# Files that run or are parsed on Linux (EC2, containers, Jenkins) must keep
+# LF in the working tree too, even on Windows. A CRLF line ending breaks bash
+# ("$'\r': command not found") and can confuse Docker and Terraform.
+*.sh          text eol=lf
+Jenkinsfile   text eol=lf
+*.tf          text eol=lf
+*.tftpl       text eol=lf
+*.hcl         text eol=lf
+Dockerfile*   text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+
+# Binary files: never convert or diff.
+*.png         binary
+*.jpg         binary
+*.ico         binary
+*.woff        binary
+*.woff2       binary
