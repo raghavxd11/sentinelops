@@ -408,7 +408,7 @@ tr:hover .copy-btn, .copyable:hover .copy-btn, .copy-btn:focus-visible, .copy-bt
 .stage-passed .node { color: var(--ok); border-color: var(--ok); }
 .stage-failed .node { color: var(--fail); border-color: var(--fail); }
 .stage-failed .name { color: var(--text); font-weight: 500; }
-.stage-running .node { color: var(--info); border-color: var(--info); }
+.stage-pending .name { color: var(--muted); }
 .stage-rollback .node { color: var(--warn); border-color: var(--warn); }
 .stage-skipped .name { color: var(--muted); }
 
@@ -417,6 +417,7 @@ tr:hover .copy-btn, .copyable:hover .copy-btn, .copy-btn:focus-visible, .copy-bt
 .detail-head .meta { color: var(--text-2); font-size: 13px; margin-top: 4px; }
 .note { border-left: 2px solid var(--warn); padding: 2px 0 2px 12px; color: var(--text-2); font-size: 13px; }
 .note.fail { border-color: var(--fail); }
+.note.info { border-color: var(--info); }
 
 /* ---------- API docs ---------- */
 .endpoint { padding: 16px; border-bottom: 1px solid var(--border); }

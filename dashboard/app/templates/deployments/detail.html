@@ -4,8 +4,8 @@
 {% block crumbs %}sentinelops<span class="sep">/</span><a href="{{ url_for('deployments.list_deployments') }}">deployments</a><span class="sep">/</span>{{ deployment.id }}{% endblock %}
 
 {% block content %}
-{% set icons = {"passed": "bi-check-lg", "failed": "bi-x-lg", "skipped": "bi-dash", "running": "bi-three-dots", "unknown": "bi-question"} %}
-{% set state_labels = {"passed": "passed", "failed": "failed", "skipped": "not run", "running": "running", "unknown": "not reported"} %}
+{% set icons = {"passed": "bi-check-lg", "failed": "bi-x-lg", "skipped": "bi-dash", "pending": "bi-dot", "unknown": "bi-question"} %}
+{% set state_labels = {"passed": "passed", "failed": "failed", "skipped": "not run", "pending": "pending", "unknown": "not reported"} %}
 <div class="detail-head">
   <div>
     {{ ui.status(deployment.status) }}
@@ -29,6 +29,8 @@
   Rolled back to the previous stable image after the health check failed.
   {% endif %}
 </p>
+{% elif deployment.status == "IN_PROGRESS" %}
+<p class="note info mb-3">Build is running. Jenkins reports the result when the build finishes, not the active stage, so every stage shows as pending until then.</p>
 {% elif deployment.status == "FAILED" and deployment.failed_stage %}
 <p class="note fail mb-3">Pipeline stopped at the {{ deployment.failed_stage }} stage. Nothing was deployed, so the running version was not affected.</p>
 {% endif %}
@@ -36,7 +38,7 @@
 <div class="panel mb-3">
   <div class="panel-head">
     <h2>Pipeline</h2>
-    <span class="sub">{{ deployment.duration_seconds|duration }} total</span>
+    {% if deployment.status != "IN_PROGRESS" %}<span class="sub">{{ deployment.duration_seconds|duration }} total</span>{% endif %}
   </div>
   <div class="panel-body">
     <ol class="pipeline">

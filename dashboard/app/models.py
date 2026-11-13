@@ -110,7 +110,7 @@ class Deployment(db.Model):
     def stages(self):
         """Pipeline timeline as a list of (stage name, state).
 
-        States: passed, failed, skipped, running, unknown.
+        States: passed, failed, skipped, pending, unknown.
         The timeline is derived from the final status and failed_stage, because
         Jenkins reports one result per deployment, not one per stage.
         """
@@ -118,7 +118,8 @@ class Deployment(db.Model):
             return [(name, "passed") for name in STAGES]
 
         if self.status == "IN_PROGRESS":
-            return [(name, "running") for name in STAGES]
+            # The dashboard is not told which stage is active, so it does not guess.
+            return [(name, "pending") for name in STAGES]
 
         if self.status == "ROLLED_BACK":
             # Everything passed until the health check, then the rollback ran.

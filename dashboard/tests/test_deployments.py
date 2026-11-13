@@ -71,6 +71,22 @@ def test_stages_failed_marks_later_stages_skipped():
     assert stages["Deploy"] == "skipped"
 
 
+def test_stages_in_progress_are_all_pending():
+    # The dashboard does not know the active stage, so no stage is shown as running.
+    stages = Deployment(status="IN_PROGRESS").stages()
+    assert stages == [(name, "pending") for name in STAGES]
+
+
+def test_detail_of_in_progress_build_shows_pending_stages_and_one_indicator(auth_client, report):
+    deployment_id = report(status="IN_PROGRESS", duration_seconds=None).get_json()["id"]
+    page = auth_client.get(f"/deployments/{deployment_id}").get_data(as_text=True)
+
+    assert page.count('<li class="stage-pending">') == len(STAGES)
+    assert "running</span>" not in page
+    assert page.count("status-in-progress") == 1  # the single "In progress" pill
+    assert "Build is running." in page
+
+
 def test_stages_failed_without_stage_is_unknown():
     stages = Deployment(status="FAILED").stages()
     assert all(state == "unknown" for _, state in stages)
