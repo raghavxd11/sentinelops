@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+#   Copy-Item terraform.tfvars.example terraform.tfvars
+
+# Your public IP + /32. Find it with: (Invoke-RestMethod https://checkip.amazonaws.com).Trim()
+my_ip_cidr = "203.0.113.7/32"
+
+# Alarms and pipeline results are emailed here. Confirm the subscription email from AWS.
+alert_email = "you@example.com"
+
+# Name of an EC2 key pair you created in the console (EC2 > Key pairs), for SSH.
+key_name = "sentinelops-key"
+
+# Optional overrides (defaults shown)
+# aws_region          = "ap-south-1"
+# instance_type       = "t3.medium"
+# detailed_monitoring = true
