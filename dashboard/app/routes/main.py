@@ -23,10 +23,10 @@ def overview():
         "per_day": deployments_per_day(days=14),
         "breakdown": stats["status_breakdown"],
     }
-    recent = Deployment.query.order_by(Deployment.created_at.desc()).limit(8).all()
+    recent = Deployment.query.order_by(*Deployment.newest_first()).limit(8).all()
     open_incidents = (
         Incident.query.filter_by(status="OPEN")
-        .order_by(Incident.created_at.desc())
+        .order_by(Incident.created_at.desc(), Incident.id.desc())
         .limit(6)
         .all()
     )
@@ -43,7 +43,7 @@ def overview():
 @login_required
 def api_docs():
     # Example responses on the page are real rows from the database.
-    latest = Deployment.query.order_by(Deployment.created_at.desc()).first()
+    latest = Deployment.query.order_by(*Deployment.newest_first()).first()
     return render_template(
         "api_docs.html",
         base_url=request.host_url.rstrip("/"),

@@ -41,7 +41,7 @@ def list_deployments():
     else:
         status = ""
 
-    pagination = query.order_by(Deployment.created_at.desc()).paginate(
+    pagination = query.order_by(*Deployment.newest_first()).paginate(
         page=page, per_page=PER_PAGE, error_out=False
     )
     return render_template(

@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
+from sqlalchemy import and_, or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db
@@ -61,7 +62,7 @@ class Service(db.Model):
     def last_deployment(self):
         return (
             Deployment.query.filter_by(service_id=self.id)
-            .order_by(Deployment.created_at.desc())
+            .order_by(*Deployment.newest_first())
             .first()
         )
 
@@ -91,6 +92,15 @@ class Deployment(db.Model):
     service = db.relationship("Service", back_populates="deployments")
     incidents = db.relationship("Incident", back_populates="deployment")
 
+    @staticmethod
+    def newest_first():
+        """ORDER BY for "newest first".
+
+        MySQL stores DATETIME to the second, so two deployments reported in the
+        same second have equal created_at. The id breaks the tie.
+        """
+        return Deployment.created_at.desc(), Deployment.id.desc()
+
     @property
     def short_hash(self):
         return self.commit_hash[:7]
@@ -101,9 +111,13 @@ class Deployment(db.Model):
             Deployment.query.filter(
                 Deployment.service_id == self.service_id,
                 Deployment.status == "SUCCESS",
-                Deployment.created_at < self.created_at,
+                or_(
+                    Deployment.created_at < self.created_at,
+                    # Same second: the row with the lower id was reported first.
+                    and_(Deployment.created_at == self.created_at, Deployment.id < self.id),
+                ),
             )
-            .order_by(Deployment.created_at.desc())
+            .order_by(*Deployment.newest_first())
             .first()
         )
 

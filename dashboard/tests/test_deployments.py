@@ -1,4 +1,7 @@
 """Deployments list, filters, detail page and the pipeline timeline."""
+from datetime import datetime
+
+from app.extensions import db
 from app.models import STAGES, Deployment
 
 
@@ -90,3 +93,30 @@ def test_detail_of_in_progress_build_shows_pending_stages_and_one_indicator(auth
 def test_stages_failed_without_stage_is_unknown():
     stages = Deployment(status="FAILED").stages()
     assert all(state == "unknown" for _, state in stages)
+
+
+def same_second_pair(service):
+    """Two deployments with the same created_at, as MySQL stores them (no microseconds)."""
+    moment = datetime(2026, 11, 13, 9, 30, 0)
+    first = Deployment(
+        service=service, commit_hash="a" * 40, status="SUCCESS", build_number=1, created_at=moment
+    )
+    second = Deployment(
+        service=service, commit_hash="b" * 40, status="ROLLED_BACK", build_number=2,
+        created_at=moment,
+    )
+    db.session.add_all([first, second])
+    db.session.commit()
+    return first, second
+
+
+def test_same_second_deployments_are_listed_newest_first(client, service):
+    same_second_pair(service)
+    listed = client.get("/api/deployments").get_json()
+    assert [d["build_number"] for d in listed] == [2, 1]
+
+
+def test_previous_stable_works_for_same_second_deployments(service):
+    first, second = same_second_pair(service)
+    assert second.previous_stable() == first
+    assert first.previous_stable() is None

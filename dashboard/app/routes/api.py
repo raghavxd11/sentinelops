@@ -67,7 +67,7 @@ def list_deployments():
         query = query.filter(Service.name == service)
 
     limit = min(request.args.get("limit", 50, type=int), 200)
-    deployments = query.order_by(Deployment.created_at.desc()).limit(limit).all()
+    deployments = query.order_by(*Deployment.newest_first()).limit(limit).all()
     return jsonify([d.to_dict() for d in deployments])
 
 

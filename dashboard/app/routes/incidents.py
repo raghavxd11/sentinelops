@@ -17,7 +17,7 @@ def build_form(incident=None):
         SelectChoice(s.id, s.name) for s in Service.query.order_by(Service.name)
     ]
 
-    recent = Deployment.query.order_by(Deployment.created_at.desc()).limit(50).all()
+    recent = Deployment.query.order_by(*Deployment.newest_first()).limit(50).all()
     # Keep the currently linked deployment selectable even if it is older than the last 50.
     if incident and incident.deployment and incident.deployment not in recent:
         recent.append(incident.deployment)
@@ -59,7 +59,7 @@ def list_incidents():
         "RESOLVED": Incident.query.filter_by(status="RESOLVED").count(),
     }
     counts["ALL"] = counts["OPEN"] + counts["RESOLVED"]
-    incidents = query.order_by(Incident.created_at.desc()).all()
+    incidents = query.order_by(Incident.created_at.desc(), Incident.id.desc()).all()
     return render_template(
         "incidents/list.html", incidents=incidents, status=status, counts=counts
     )
