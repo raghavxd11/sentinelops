@@ -452,7 +452,6 @@ tr:hover .copy-btn, .copyable:hover .copy-btn, .copy-btn:focus-visible, .copy-bt
 .doc ol li::marker { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 .doc ol strong { color: var(--text); font-weight: 500; }
 .doc .stack { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); }
-.doc footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
 
 .flow { display: flex; align-items: center; flex-wrap: wrap; row-gap: 8px; }
 .flow .box { font-family: var(--font-mono); font-size: 12px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); white-space: nowrap; }
