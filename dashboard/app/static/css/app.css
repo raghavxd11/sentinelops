@@ -9,11 +9,12 @@
   --border: #2A2E35;
   --text: #E7E9EC;
   --text-2: #9BA1AB;
-  --muted: #6B717C;
+  --muted: #858B95;
 
   --accent: #3FB950;
   --accent-hover: #4CC65D;
   --on-accent: #0E0F11;
+  --on-fail: #0E0F11;
   --focus: rgba(63, 185, 80, 0.35);
 
   --ok: #3FB950;
@@ -29,25 +30,29 @@
   --topbar-h: 56px;
 }
 
+/* Every text color below has a contrast ratio of at least 4.5:1 (WCAG AA) on
+   all three backgrounds (--bg, --surface, --raised). The same holds for the
+   dark theme above. tests/test_theme.py checks both. */
 [data-theme="light"] {
   --bg: #F6F7F8;
   --surface: #FFFFFF;
   --raised: #F0F1F3;
-  --border: #D9DCE1;
-  --text: #1B1D21;
-  --text-2: #555B66;
-  --muted: #7F8691;
+  --border: #D0D4DA;
+  --text: #14161A;
+  --text-2: #454A54;
+  --muted: #5F6570;
 
-  --accent: #1F883D;
-  --accent-hover: #1A7534;
+  --accent: #18742F;
+  --accent-hover: #14652A;
   --on-accent: #FFFFFF;
-  --focus: rgba(31, 136, 61, 0.3);
+  --on-fail: #FFFFFF;
+  --focus: rgba(24, 116, 47, 0.3);
 
-  --ok: #1A7F37;
-  --fail: #CF222E;
-  --warn: #9A6700;
-  --info: #0969DA;
-  --neutral: #6E7781;
+  --ok: #18742F;
+  --fail: #C4202B;
+  --warn: #8A5D00;
+  --info: #0A63CC;
+  --neutral: #636975;
 }
 
 /* Point Bootstrap's own variables at ours so its components follow the theme. */
@@ -72,12 +77,11 @@ body {
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 14px;
-  -webkit-font-smoothing: antialiased;
 }
 
 a { color: var(--text); text-decoration: none; transition: color 120ms; }
 a:hover { color: var(--accent); }
-a.link { text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+a.link { text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 3px; }
 a.link:hover { text-decoration-color: var(--accent); }
 
 h1, h2, h3 { font-weight: 600; margin: 0; letter-spacing: -0.01em; }
@@ -135,10 +139,10 @@ h3 { font-size: 14px; }
   --bs-btn-color: var(--fail);
   --bs-btn-bg: transparent;
   --bs-btn-border-color: var(--border);
-  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-color: var(--on-fail);
   --bs-btn-hover-bg: var(--fail);
   --bs-btn-hover-border-color: var(--fail);
-  --bs-btn-active-color: #fff;
+  --bs-btn-active-color: var(--on-fail);
   --bs-btn-active-bg: var(--fail);
   --bs-btn-active-border-color: var(--fail);
   --bs-btn-focus-shadow-rgb: 248, 81, 73;
@@ -261,7 +265,8 @@ textarea.form-control { min-height: 140px; line-height: 1.55; }
 .kpi.small .kpi-value { font-size: 20px; }
 
 /* ---------- tables ---------- */
-.table-wrap { overflow-x: auto; }
+/* position: relative keeps visually hidden header text inside the scroll box. */
+.table-wrap { overflow-x: auto; position: relative; }
 .table-ops { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table-ops th {
   text-align: left; font-weight: 500; font-size: 12px; color: var(--muted);
@@ -280,6 +285,7 @@ textarea.form-control { min-height: 140px; line-height: 1.55; }
 .truncate.narrow { max-width: min(260px, 17vw); }
 .truncate.wide { max-width: min(460px, 28vw); }
 .cell-sub { font-size: 12px; color: var(--muted); }
+.col-main { min-width: 220px; }
 
 /* ---------- status pill, severity tag ---------- */
 .status {
@@ -338,6 +344,7 @@ tr:hover .copy-btn, .copyable:hover .copy-btn, .copy-btn:focus-visible, .copy-bt
 .kv dt, .kv dd { padding: 8px 16px; margin: 0; border-bottom: 1px solid var(--border); font-size: 13px; min-width: 0; }
 .kv dt { color: var(--muted); font-weight: 400; }
 .kv dd { overflow-wrap: anywhere; }
+.kv .copyable { display: inline; white-space: normal; }  /* a full commit hash wraps on narrow screens */
 .kv dt:last-of-type, .kv dd:last-of-type { border-bottom: 0; }
 
 /* code blocks (terminal, API docs) */
@@ -381,7 +388,7 @@ tr:hover .copy-btn, .copyable:hover .copy-btn, .copy-btn:focus-visible, .copy-bt
 .chart-box { position: relative; height: 286px; }
 .chart-box.donut { height: 170px; }
 .legend-list { list-style: none; margin: 14px 0 0; padding: 0; font-size: 13px; }
-.legend-list li { display: flex; align-items: center; gap: 8px; padding: 3px 0; color: var(--text-2); }
+.legend-list li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .legend-list .swatch { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .legend-list .n { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--text); }
 
@@ -486,6 +493,7 @@ tr:hover .copy-btn, .copyable:hover .copy-btn, .copy-btn:focus-visible, .copy-bt
   .kv { grid-template-columns: 110px 1fr; }
   .kpi-value { font-size: 20px; }
   .truncate, .truncate.narrow, .truncate.wide { max-width: 200px; }
+  .fields td:first-child { white-space: normal; }
 
   .pipeline { flex-direction: column; gap: 10px; padding: 0; }
   .pipeline li { display: flex; align-items: center; gap: 10px; text-align: left; }

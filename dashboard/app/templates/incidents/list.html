@@ -28,7 +28,7 @@
         {% for incident in incidents %}
         <tr>
           <td>{{ ui.severity(incident.severity) }}</td>
-          <td>
+          <td class="col-main">
             <a href="{{ url_for('incidents.edit', incident_id=incident.id) }}"><span class="mono muted">#{{ incident.id }}</span> {{ incident.title }}</a>
             {% if incident.root_cause %}<div class="cell-sub truncate wide" title="{{ incident.root_cause }}">{{ incident.root_cause }}</div>
             {% elif incident.status == "OPEN" %}<div class="cell-sub">Root cause not written yet</div>{% endif %}

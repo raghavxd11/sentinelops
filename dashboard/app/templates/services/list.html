@@ -23,7 +23,7 @@
         {% for service in services %}
         {% set last = service.last_deployment %}
         <tr>
-          <td>
+          <td class="col-main">
             <a class="mono" href="{{ url_for('deployments.list_deployments', q=service.name) }}">{{ service.name }}</a>
             {% if service.description %}<div class="cell-sub">{{ service.description }}</div>{% endif %}
           </td>

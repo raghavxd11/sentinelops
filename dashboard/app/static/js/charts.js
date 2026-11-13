@@ -75,7 +75,7 @@
             y: { stacked: true, beginAtZero: true, grid: { color: border, lineWidth: 1 }, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 6 } }
           },
           plugins: {
-            legend: { position: 'top', align: 'start', labels: { boxWidth: 8, boxHeight: 8, padding: 14, color: text2 } },
+            legend: { position: 'top', align: 'start', labels: { boxWidth: 8, boxHeight: 8, padding: 14, color: text } },
             tooltip: tooltip
           }
         }
