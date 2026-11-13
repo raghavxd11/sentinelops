@@ -50,7 +50,11 @@ PAGE = """<!doctype html>
       <dt>Container</dt><dd>{{ hostname }}</dd>
       <dt>Health</dt>
       <dd>
-        {% if healthy %}<span class="ok">ok</span>{% else %}<span class="bad">failing</span>{% endif %}
+        {% if healthy %}
+        <span class="ok">ok</span>
+        {% else %}
+        <span class="bad">failing</span>
+        {% endif %}
         (<a href="/health">/health</a>)
       </dd>
       <dt>JSON</dt><dd><a href="/api/info">/api/info</a></dd>
