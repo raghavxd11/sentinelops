@@ -1,0 +1,36 @@
+# !!! DELIBERATELY VULNERABLE - FOR THE "TRIVY BLOCKS THE BUILD" DEMO ONLY !!!
+#
+# Same app as Dockerfile, but built on an old, unpatched base image
+# (python:3.10.0-slim from October 2021, Debian 11). Its OS packages have many
+# HIGH/CRITICAL CVEs that already have fixes, so this Trivy scan fails:
+#   trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 <image>
+# and the pipeline stops before the image is pushed or deployed.
+#
+# Never deploy this image. The real image is built from Dockerfile.
+#
+# Build it for the demo (from the repo root):
+#   docker build -f demo-app/Dockerfile.vulnerable -t demo-app:vulnerable demo-app
+
+# OLD BASE IMAGE ON PURPOSE (the real Dockerfile uses python:3.11-slim and
+# installs security updates).
+FROM python:3.10.0-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app.py .
+
+RUN useradd --create-home appuser
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).status == 200 else 1)"
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
