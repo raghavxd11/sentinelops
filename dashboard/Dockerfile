@@ -3,10 +3,17 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# Security fixes published after the base image was built (Trivy finds them).
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# setuptools is only needed to install packages, not to run the app. Removing it
+# also removes the old copies of wheel and jaraco.context bundled inside it,
+# which have HIGH CVEs.
+RUN pip uninstall -y setuptools
 
 # NEW: the dashboard is a folder plus two files
 COPY app/ app/
