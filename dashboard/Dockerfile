@@ -23,4 +23,6 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=2).status == 200 else 1)"
 
 # NEW: wsgi:app, 2 worker processes
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "wsgi:app"]
+# --preload: load the app (and create the tables) once before starting the
+# workers, so two workers never run CREATE TABLE at the same time.
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--preload", "wsgi:app"]
