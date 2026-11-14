@@ -21,3 +21,15 @@ variable "my_ip_cidr" {
   description = "Your public IP in CIDR form, e.g. 1.2.3.4/32. SSH and Jenkins are only open to this."
   type        = string
 }
+
+variable "instance_type" {
+  description = "Server size. t3.medium = 2 CPUs, 4 GB RAM (enough for Jenkins + Docker)."
+  type        = string
+  default     = "t3.medium"
+}
+
+variable "key_name" {
+  description = "Existing EC2 key pair for SSH. In the Learner Lab this is vockey."
+  type        = string
+  default     = "vockey"
+}
