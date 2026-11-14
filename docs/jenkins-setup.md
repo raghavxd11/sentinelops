@@ -144,9 +144,15 @@ In the GitHub repo: **Settings → Webhooks → Add webhook**:
 - Active: ticked → **Add webhook**
 
 GitHub sends a test ping right away. **Recent Deliveries** should show a green
-tick (HTTP 200). The security group lets GitHub's webhook IP ranges reach port
-8080. If deliveries time out, check that `github_webhook_cidrs` in
-`terraform.tfvars` is current (`curl https://api.github.com/meta | jq .hooks`).
+tick (HTTP 200).
+
+Port 8080 is open to the whole internet (`0.0.0.0/0` in `terraform/security.tf`).
+An allow-list of GitHub's published "hooks" IP ranges was tried first, but GitHub
+also sent deliveries from IPs outside those ranges, so the security group dropped
+them ("failed to connect to host"). Jenkins is protected by its login instead:
+anonymous users can't see or start jobs, and `/github-webhook/` only makes Jenkins
+check the repo for new commits. Use a strong admin password. SSH (port 22) stays
+limited to your IP.
 
 ## 6. Demos
 
@@ -232,7 +238,7 @@ and exits 2, so the build is FAILED, not ROLLED_BACK.
 | `... could not reach http://localhost:5000` | Dashboard stack is down: `docker compose -f docker-compose.prod.yml up -d`. |
 | `permission denied ... /var/run/docker.sock` | `jenkins` user is not in the `docker` group (step 2). |
 | Push: `no basic auth credentials` or `AccessDenied` | Instance profile missing or the Learner Lab session expired. Start the lab again; `sudo -u jenkins aws sts get-caller-identity` must work. |
-| Webhook does nothing | Check GitHub → Webhooks → Recent Deliveries; the Payload URL needs the trailing `/github-webhook/`. |
+| Webhook does nothing | Check GitHub → Webhooks → Recent Deliveries; the Payload URL needs the trailing `/github-webhook/`. "failed to connect to host" means port 8080 is blocked: check the security group's 8080 rule is `0.0.0.0/0` and Jenkins is running. |
 | Build with Parameters missing | Run the job once with Build Now; the parameters come from the Jenkinsfile. |
 
 After the Learner Lab session ends the instance stops. When it starts again, Jenkins

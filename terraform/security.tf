@@ -18,11 +18,13 @@ resource "aws_security_group" "server" {
   }
 
   ingress {
-    description = "Jenkins from my IP and GitHub webhooks"
+    description = "Jenkins (protected by login). Open so GitHub webhooks can reach it"
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = concat([var.my_ip_cidr], var.github_webhook_cidrs)
+    # Open to all: GitHub also sends webhooks from IPs outside its published
+    # "hooks" ranges, so an IP allow-list drops some deliveries.
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {

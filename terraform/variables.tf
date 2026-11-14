@@ -12,13 +12,8 @@ variable "project_name" {
   default     = "sentinelops"
 }
 
-variable "github_webhook_cidrs" {
-  description = "GitHub's webhook IP ranges, so GitHub can reach Jenkins on port 8080."
-  type        = list(string)
-}
-
 variable "my_ip_cidr" {
-  description = "Your public IP in CIDR form, e.g. 1.2.3.4/32. SSH and Jenkins are only open to this."
+  description = "Your public IP in CIDR form, e.g. 1.2.3.4/32. SSH is only open to this."
   type        = string
 }
 
