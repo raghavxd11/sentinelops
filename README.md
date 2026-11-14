@@ -1,171 +1,211 @@
 # SentinelOps
 
-Self-healing CI/CD platform on AWS. Every push is linted, tested and scanned with Trivy, built into a Docker image tagged with its Git commit, pushed to Amazon ECR and deployed to EC2 by Jenkins. If the new version fails its health check, the pipeline rolls back to the last stable image on its own. Crashed or hung containers restart themselves, and every deployment is reported to a web dashboard that traces it back to its commit.
+A self-healing CI/CD pipeline on AWS. Every push to `main` is tested, built into
+a Docker image tagged with its Git commit, scanned with Trivy, pushed to Amazon
+ECR and deployed to EC2 by Jenkins. If the new version fails its health check,
+the pipeline rolls back to the last stable image by itself. Crashed or hung
+containers restart themselves, and every deployment is reported to a web
+dashboard that traces it back to its commit.
+
+The deployed app is **Brewly**, a small website for a fictional coffee shop.
+Its footer shows the version, commit and container it is running, so every
+deploy and every rollback is visible in the browser.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    dev[Developer] -->|push / pull request| gh[GitHub]
-    gh -->|webhook| jenkins
+    dev[Developer] -->|git push main| gh[GitHub]
+    gh -->|webhook, port 8080| jenkins
 
-    subgraph ec2 [EC2 t3.medium, created by Terraform]
-        jenkins[Jenkins pipeline]
-        prod[demo-app production :8000]
-        stg[demo-app staging :8001]
-        dash[Dashboard :5000 + MySQL]
-        heal[autoheal]
+    subgraph aws [AWS us-east-1, created by Terraform]
+        subgraph ec2 [EC2 t3.medium, Amazon Linux 2023, Elastic IP]
+            jenkins[Jenkins]
+            demo[demo-app / Brewly :8000]
+            dash[Dashboard :5000]
+            mysql[(MySQL 8)]
+            heal[autoheal]
+        end
+        ecr[(ECR: sentinelops/demo-app)]
     end
 
-    jenkins -->|push commit tag, move latest-stable| ecr[(Amazon ECR)]
-    ecr -->|pull| prod
-    ecr -->|pull| stg
-    jenkins -->|deploy, health check, rollback| prod
-    jenkins -->|deploy, health check, rollback| stg
+    jenkins -->|push :commit and :latest-stable| ecr
+    ecr -->|pull| demo
+    jenkins -->|deploy, health check, rollback| demo
     jenkins -->|POST /api/deployments| dash
-    heal -->|restart unhealthy| prod
-    jenkins -->|build result| sns[SNS email]
-    prod -.->|logs, health metric| cw[CloudWatch logs, metrics, alarms, dashboard]
-    cw -->|alarm| sns
-    cw -->|status check failed: recover| ec2
+    dash --> mysql
+    heal -->|restart when unhealthy| demo
+    heal -->|restart when unhealthy| dash
 ```
 
-**Pipeline** ([Jenkinsfile](Jenkinsfile)): Checkout → Setup → Lint (flake8) ‖ Unit tests + coverage (pytest) ‖ Dependency scan (Trivy) → Docker build → Image scan (Trivy, fails on fixable HIGH/CRITICAL) → Push to ECR → Approval (`main` only) → Deploy → Health check (5 tries, backoff) → tag `latest-stable` **or** roll back → report to the dashboard + SNS email.
+One EC2 server runs everything: Jenkins, Docker, the dashboard stack and the
+deployed demo-app. Terraform (`terraform/`) creates:
 
-`dev` deploys to staging (port 8001), `main` deploys to production (port 8000) after a manual approval. Feature branches and pull requests run every check up to the image scan.
+| Resource | Details |
+|---|---|
+| EC2 instance | t3.medium, Amazon Linux 2023, 30 GB gp3, IMDSv2 required. `user_data.sh` installs Docker, Compose, Jenkins, Trivy, python3.11, jq and git on first boot |
+| Elastic IP | fixed public IP that survives stop/start |
+| Security group | 22 (SSH) from my IP only. 8080 (Jenkins) open so GitHub webhooks can reach it, protected by the Jenkins login. 5000 (dashboard) and 8000 (demo-app) open |
+| ECR repository | `sentinelops/demo-app`, scan on push, lifecycle policy keeps the last 10 images |
 
-**Self-healing, three levels**
+AWS access on the server comes from the AWS Academy Learner Lab's existing
+`LabInstanceProfile` (the lab doesn't allow creating IAM roles). No AWS keys are
+stored on the server, in Jenkins or in the repo.
+
+## The pipeline
+
+[`Jenkinsfile`](Jenkinsfile) (declarative), triggered by the GitHub webhook on
+every push to `main`:
+
+| # | Stage | What happens |
+|---|---|---|
+| 1 | Checkout | Clones the commit and records hash, author, message and commit time |
+| 2 | Test | pytest for demo-app in a python3.11 venv; JUnit results published, coverage XML archived |
+| 3 | Build | `docker build`, image tagged with the short commit SHA and labelled with the full commit and build number |
+| 4 | Scan | Trivy image scan, fails on fixable HIGH/CRITICAL vulnerabilities; report archived |
+| 5 | Push | Logs in with `aws ecr get-login-password` and pushes the image to ECR |
+| 6 | Deploy | [`scripts/deploy.sh`](scripts/deploy.sh) replaces the `demo-app` container on port 8000 |
+| 7 | Health check | [`scripts/healthcheck.sh`](scripts/healthcheck.sh) calls `/health` up to 5 times, 5 s apart |
+
+- **Healthy:** the image is also tagged `latest-stable` in ECR. It becomes the version to roll back to.
+- **Unhealthy:** [`scripts/rollback.sh`](scripts/rollback.sh) redeploys `latest-stable` and checks its health again. The build ends UNSTABLE and is reported as ROLLED_BACK.
+- **Always:** [`scripts/report.sh`](scripts/report.sh) posts the result (commit, author, branch, build number, image tag, status, duration, failed stage) to the dashboard. A failed report never fails the build. The workspace is then cleaned.
+
+Two build parameters exist for the demos: `BREAK_HEALTH` deploys a version
+whose `/health` returns 500, to show the rollback. `DOCKERFILE=Dockerfile.vulnerable`
+builds on an old base image, to show Trivy blocking the build. The dashboard
+token is a Jenkins "Secret text" credential, masked in logs. Options:
+timestamps, build discarder, 30-minute timeout.
+
+## Self-healing
 
 | Level | Failure | What heals it |
 |---|---|---|
-| Application | New version fails `/health` after deploy | `scripts/rollback.sh` redeploys the last image tagged stable in ECR and re-checks health |
-| Container | Process crashes / app hangs | Docker restart policy `unless-stopped` / Docker HEALTHCHECK + autoheal container |
-| Infrastructure | AWS host fails the system status check | CloudWatch alarm with the `ec2:recover` action |
+| Application | A new version fails `/health` after deploy | Jenkins runs `rollback.sh`: the `latest-stable` image from ECR is redeployed and re-checked |
+| Container: crash | The app process exits | Docker restart policy `unless-stopped` starts it again |
+| Container: hang | The process runs but `/health` fails | Docker `HEALTHCHECK` marks the container unhealthy, the [autoheal](https://github.com/willfarrell/docker-autoheal) container restarts it |
+
+On the first deploy there is no `latest-stable` yet, so `rollback.sh` stops with a
+clear message and the build fails instead of rolling back.
+
+## Security gate: Trivy
+
+Every image is scanned before it is pushed:
+
+```bash
+trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 <image>
+```
+
+`--ignore-unfixed` skips CVEs that have no fix yet (otherwise the pipeline would
+stay red for problems nobody can patch). Both Dockerfiles use `python:3.11-slim`,
+install Debian security updates, remove `setuptools` (it bundles old packages
+with HIGH CVEs) and run as a non-root user. `demo-app/Dockerfile.vulnerable` is
+kept only to demonstrate the gate: it fails the scan, so it is never pushed or
+deployed. Scan results: [docs/docker.md](docs/docker.md#image-scanning-with-trivy).
+
+## The two apps
+
+**demo-app (Brewly)** is the app the pipeline deploys. It's a Flask app with plain
+HTML/CSS templates and no JavaScript.
+
+- Pages: `/` (home), `/menu`, `/about`. The footer shows `Version <APP_VERSION> · commit <short GIT_COMMIT> · container <hostname>`.
+- `/health`: 200, or 500 when `BREAK_HEALTH=true` or while `/tmp/break-health` exists (that file is removed when the app starts, so a restart fixes it).
+- `/api/info`: version, commit and hostname as JSON.
+- Runs with gunicorn on port 8000. 35 pytest tests.
+
+**Dashboard** tracks every deployment. It uses Flask, Flask-Login, Flask-WTF,
+Flask-SQLAlchemy, MySQL 8, Bootstrap 5 and Chart.js, all served locally with no CDN.
+
+- Login, register and logout, with hashed passwords and CSRF protection on every form.
+- Overview: total deployments, success rate, rollbacks, open incidents, deployment frequency, MTTR, lead time (commit to deploy), and charts of deployments per day and by status.
+- Services (create, edit, delete), Deployments (status filter, detail page with the full trace and a stage timeline), Incidents (create, edit root cause, resolve, delete).
+- REST API: `POST /api/deployments` (needs the `X-API-Token` header, compared in constant time), `GET /api/deployments`, `GET /api/stats`, `GET /health`. A deployment reported as FAILED or ROLLED_BACK opens an incident automatically.
+- `seed.py` adds demo data marked `is_seed` (the UI shows a "demo data" note). `seed.py --clear` removes it and keeps real pipeline data.
+- 106 pytest tests.
 
 ## Project structure
 
 ```
 sentinelops/
-├── dashboard/                 # Flask dashboard: UI, REST API, MySQL/SQLite, pytest suite
-│   ├── app/                   # app factory, models, routes, templates, static files
+├── dashboard/                # Flask dashboard: UI, REST API, DB models, 106 tests
+│   ├── app/                  # app factory, models, metrics, routes, templates, static
 │   ├── tests/
-│   ├── seed.py                # demo data (marked is_seed), --clear removes it
-│   └── wsgi.py
-├── demo-app/                  # small Flask service the pipeline deploys
-│   ├── app.py                 # /, /health, /api/info; BREAK_HEALTH=true breaks /health
-│   ├── tests/
+│   ├── seed.py               # demo data (is_seed), --clear removes it
+│   ├── wsgi.py
 │   └── Dockerfile
-├── Jenkinsfile                # declarative pipeline (repo root, found by Jenkins)
+├── demo-app/                 # Brewly website, the app the pipeline deploys
+│   ├── app.py                # pages, /health, /api/info, menu data
+│   ├── templates/  static/   # HTML pages and one stylesheet
+│   ├── tests/                # 35 tests
+│   ├── Dockerfile
+│   └── Dockerfile.vulnerable # old base image, only for the Trivy demo
+├── Jenkinsfile               # the pipeline
 ├── scripts/
-│   ├── common.sh              # per-environment settings shared by the scripts
-│   ├── deploy.sh              # run an image as the production/staging container
-│   ├── healthcheck.sh         # GET /health with retries and exponential backoff
-│   ├── rollback.sh            # redeploy the stable image, verify health
-│   ├── report.sh              # POST the pipeline result to the dashboard API
-│   └── chaos.sh               # crash / hang / CPU stress / broken deploy, for demos
-├── terraform/                 # EC2, ECR, IAM, security group, SNS, CloudWatch (see its README)
-├── monitoring/
-│   └── cloudwatch-agent.json  # memory and disk metrics from the instance
+│   ├── deploy.sh             # replace the demo-app container with a new image
+│   ├── healthcheck.sh        # GET /health with retries
+│   ├── rollback.sh           # redeploy latest-stable and re-check health
+│   └── report.sh             # POST the result to the dashboard API
+├── terraform/                # EC2, Elastic IP, security group, ECR (+ user_data.sh)
 ├── docs/
-│   └── jenkins-setup.md       # plugins, credentials, multibranch job, webhook
-├── .env.example               # dashboard settings (copy to .env)
-├── .gitattributes             # LF line endings for scripts, Terraform, Docker, YAML
-└── LICENSE
+│   ├── docker.md             # images, compose files, self-healing tests, Trivy results
+│   └── jenkins-setup.md      # server setup, Jenkins job, webhook, demo steps
+├── docker-compose.yml        # local: MySQL + dashboard + demo-app + autoheal
+├── docker-compose.prod.yml   # EC2: MySQL + dashboard + autoheal (demo-app comes from Jenkins)
+├── .env.example              # settings, copy to .env (never committed)
+└── .gitattributes            # LF line endings for scripts, Terraform, Docker, YAML
 ```
 
 ## Tech stack
 
 | Area | Tools |
 |---|---|
-| Application | Python 3.11, Flask, Flask-Login, Flask-WTF (CSRF), Flask-SQLAlchemy, Jinja, Bootstrap 5, Chart.js |
-| Database | MySQL 8 (Docker); SQLite for quick local runs and unit tests |
-| Quality and security | pytest + coverage, flake8, Trivy (dependency and image scans), ECR scan on push |
-| Containers | Docker, Docker Compose, autoheal |
-| CI/CD | Jenkins declarative multibranch pipeline, GitHub webhook |
-| Infrastructure as Code | Terraform (AWS provider 6) |
-| AWS | EC2, ECR, IAM role + instance profile, Security Group, Elastic IP, CloudWatch Logs / alarms / dashboard, SNS |
+| Apps | Python 3.11, Flask, gunicorn, Jinja; dashboard also uses Flask-Login, Flask-WTF, Flask-SQLAlchemy, Bootstrap 5, Chart.js |
+| Database | MySQL 8 in Docker; SQLite for quick local runs and unit tests |
+| Quality and security | pytest + coverage, flake8, Trivy image scan, ECR scan on push |
+| Containers | Docker (slim images, non-root user, HEALTHCHECK), Docker Compose, autoheal |
+| CI/CD | Jenkins declarative pipeline, GitHub webhook |
+| Infrastructure as Code | Terraform, AWS provider 6 |
+| AWS | EC2, Elastic IP, Security Group, ECR, Learner Lab instance profile |
 
-## Status
+## Run locally
 
-Work in progress for a college DevOps project (demo on 16 Nov 2026).
+Needs Docker Desktop. Commands are for Windows PowerShell, from the repository root.
 
-- [x] Dashboard: auth, services / deployments / incidents CRUD, REST API, automatic incidents, DevOps metrics, 106 tests
-- [x] demo-app with tests (15), including the broken-health case
-- [x] demo-app Dockerfile (non-root user, HEALTHCHECK)
-- [ ] Dashboard Dockerfile and `docker-compose.yml` (MySQL + dashboard + demo-app + autoheal)
-- [x] Terraform for all AWS resources: written, `terraform fmt` and `terraform validate` pass. Not applied yet.
-- [x] Jenkinsfile: passes the Jenkins declarative linter. Not run on the real Jenkins yet.
-- [x] Deploy, health check, rollback, report and chaos scripts: pass shellcheck and were tested against local Docker
-- [ ] Deployed on AWS and every demo scenario run end to end
-- [ ] `docs/RESULTS.md` with measured results, `docs/demo-guide.md`
+```powershell
+Copy-Item .env.example .env       # then fill in the values (instructions inside the file)
+docker compose up --build -d      # MySQL + dashboard + demo-app + autoheal
+docker compose ps                 # all four "(healthy)" after about 30 s
+```
 
-## Documentation
+- Dashboard: http://localhost:5000. Register an account, or load demo data with `docker compose exec dashboard python seed.py` (login `admin` / `sentinel-demo`).
+- Brewly: http://localhost:8000
 
-- [terraform/README.md](terraform/README.md): resources, estimated cost, apply / stop / destroy
-- [docs/jenkins-setup.md](docs/jenkins-setup.md): Jenkins plugins, credentials, multibranch pipeline, webhook
+Stop with `docker compose down` (data is kept in the `mysql-data` volume; `down -v` deletes it).
 
-## Run the dashboard locally
-
-Commands are for Windows PowerShell, run from the repository root. Needs Python 3.11 or newer.
-
-### 1. Install
+### Without Docker (dashboard only, SQLite)
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r dashboard\requirements-dev.txt
-```
-
-If PowerShell refuses to run `Activate.ps1`, allow scripts for this window only and try again:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-### 2. Configure
-
-```powershell
-Copy-Item .env.example .env
-python -c "import secrets; print(secrets.token_hex(32))"
-```
-
-Open `.env` and paste the generated value as `SECRET_KEY`. Set `API_TOKEN` to any long random string. `.env` is ignored by git.
-
-### 3. Start
-
-```powershell
 cd dashboard
-python seed.py     # optional: demo data and the login admin / sentinel-demo
-python wsgi.py
+python seed.py        # optional demo data
+python wsgi.py        # http://127.0.0.1:5000
 ```
 
-Open http://127.0.0.1:5000. Without `DATABASE_URL` the app uses a SQLite file (`dashboard\instance\sentinelops.db`), which is enough for a quick look. Tables are created on first start.
+Without `DATABASE_URL` the dashboard uses a SQLite file in `dashboard\instance\`.
 
-Seeded rows are marked as demo data in the UI. Remove them with `python seed.py --clear`; real pipeline data is kept.
-
-### 4. Use MySQL instead of SQLite
-
-Production runs on MySQL 8. To use it locally, start one in Docker (port 3307, so it does not clash with a MySQL already installed on 3306):
+### Tests and lint
 
 ```powershell
-docker run -d --name sentinelops-mysql -p 127.0.0.1:3307:3306 `
-  -e MYSQL_DATABASE=sentinelops -e MYSQL_USER=sentinel `
-  -e MYSQL_PASSWORD=local-dev-only -e MYSQL_ROOT_PASSWORD=local-dev-only mysql:8
+cd dashboard; python -m pytest; python -m flake8 .; cd ..
+cd demo-app;  pip install -r requirements-dev.txt; python -m pytest; python -m flake8; cd ..
 ```
 
-Wait about 20 seconds for MySQL to start, then point the app at it and start it as in step 3:
+### Report a deployment by hand
 
-```powershell
-$env:DATABASE_URL = "mysql+pymysql://sentinel:local-dev-only@127.0.0.1:3307/sentinelops"
-python seed.py
-python wsgi.py
-```
-
-Remove the database when finished: `docker rm -f sentinelops-mysql`.
-
-### 5. Report a deployment by hand
-
-This is the request Jenkins sends at the end of a pipeline run. The service must exist on the Services page (`seed.py` creates `demo-app`). Replace the token with the `API_TOKEN` from `.env`.
+This is the request Jenkins sends. Use the `API_TOKEN` from `.env`. The service must
+exist on the Services page.
 
 ```powershell
 $body = @{ service = "demo-app"; commit_hash = "7c1e4b9d2f0a8e6b5c3d1f4a9b8e7d6c5b4a3f21"
@@ -174,20 +214,24 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5000/api/deployments `
   -Headers @{ "X-API-Token" = "your-api-token" } -ContentType "application/json" -Body $body
 ```
 
-The deployment appears on the Deployments page and, because it was rolled back, an incident is opened for it. All endpoints are listed on the API docs page of the dashboard.
+## Deploy on AWS
 
-### 6. Test and lint
+1. `cd terraform`, create `terraform.tfvars` with `my_ip_cidr = "<your-ip>/32"`, then `terraform init` and `terraform apply`.
+2. Follow [docs/jenkins-setup.md](docs/jenkins-setup.md): start the dashboard stack on the server, create the Jenkins credential and pipeline job, add the GitHub webhook, run the demos.
+3. Clean up with `terraform destroy` (the ECR repository is deleted with its images).
 
-```powershell
-cd dashboard
-python -m pytest
-python -m flake8 .
-```
+## Documentation
 
-Tests use an in-memory SQLite database. To run the same tests against MySQL, create an empty database that is used only for tests (every table in it is dropped after each test) and pass its URL:
+- [docs/docker.md](docs/docker.md): the Dockerfiles, local and production compose stacks, self-healing tests with timings, Trivy results
+- [docs/jenkins-setup.md](docs/jenkins-setup.md): server and Jenkins setup, GitHub webhook, how to run each demo, troubleshooting
 
-```powershell
-docker exec sentinelops-mysql mysql -uroot -plocal-dev-only -e "CREATE DATABASE sentinelops_test; GRANT ALL ON sentinelops_test.* TO 'sentinel'@'%';"
-$env:TEST_DATABASE_URL = "mysql+pymysql://sentinel:local-dev-only@127.0.0.1:3307/sentinelops_test"
-python -m pytest
-```
+## Future work
+
+- Blue-green deployments, so a new version takes traffic only after it is healthy
+- HTTPS with a domain name
+- CloudWatch alarms (CPU, health, EC2 status check with auto-recovery) with email alerts
+- A separate Jenkins host, deploying to the app server over SSH or SSM
+
+## License
+
+[MIT](LICENSE)
