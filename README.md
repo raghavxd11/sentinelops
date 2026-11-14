@@ -231,7 +231,3 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5000/api/deployments `
 - HTTPS with a domain name
 - CloudWatch alarms (CPU, health, EC2 status check with auto-recovery) with email alerts
 - A separate Jenkins host, deploying to the app server over SSH or SSM
-
-## License
-
-[MIT](LICENSE)
