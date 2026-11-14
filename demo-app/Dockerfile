@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip uninstall -y setuptools
 
 COPY app.py .
+COPY templates/ templates/
+COPY static/ static/
 
 RUN useradd --create-home appuser
 USER appuser

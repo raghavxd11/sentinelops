@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Brewly{% endblock %}</title>
+  <meta name="description" content="Brewly is a small coffee bar that roasts its own beans every Tuesday.">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="wordmark" href="{{ url_for('home') }}">Brewly</a>
+      <nav aria-label="Main">
+        <a href="{{ url_for('home') }}" {% if page == 'home' %}aria-current="page"{% endif %}>Home</a>
+        <a href="{{ url_for('menu') }}" {% if page == 'menu' %}aria-current="page"{% endif %}>Menu</a>
+        <a href="{{ url_for('about') }}" {% if page == 'about' %}aria-current="page"{% endif %}>About</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-row">
+      <p>Brewly, 12 Second Cross Street. Open daily from 7:30.</p>
+      <p class="deploy">Version {{ version }} · commit {{ short_commit }} · container {{ hostname }}</p>
+    </div>
+  </footer>
+</body>
+</html>

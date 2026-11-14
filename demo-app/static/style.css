@@ -1,0 +1,219 @@
+/* Brewly: one stylesheet for every page. No framework, no web fonts. */
+
+:root {
+  --paper: #f6f1e9;
+  --card: #fbf8f3;
+  --ink: #2a211b;
+  --muted: #6b5f55;
+  --line: #ddd3c5;
+  --accent: #9a3d1d;      /* roasted brick, used sparingly */
+  --accent-ink: #fbf8f3;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 17px/1.6 var(--sans);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main { flex: 1; }
+
+.wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+h1, h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 12px;
+}
+
+h1 { font-size: clamp(2.1rem, 5vw, 3.3rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; }
+
+p { margin: 0 0 14px; }
+
+a { color: var(--accent); }
+
+.lede { font-size: 1.12rem; color: var(--muted); max-width: 36em; }
+.small { font-size: 0.9rem; color: var(--muted); }
+
+/* Header */
+.site-header { border-bottom: 1px solid var(--line); }
+
+.header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.wordmark {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+nav { display: flex; gap: 22px; }
+
+nav a {
+  color: var(--ink);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+nav a:hover { border-bottom-color: var(--line); }
+nav a[aria-current="page"] { border-bottom-color: var(--accent); }
+
+/* Home */
+.hero { padding: 64px 0 48px; border-bottom: 1px solid var(--line); }
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 48px;
+  align-items: end;
+}
+
+.button {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--accent-ink);
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.button:hover { background: #7f3117; }
+
+.this-week {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  padding: 20px 22px 8px;
+}
+
+.label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.origin { font-family: var(--serif); font-size: 1.4rem; margin-bottom: 8px; }
+
+.highlights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 36px;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.highlights p { color: var(--muted); }
+
+.hours { padding-bottom: 56px; }
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 28px;
+  margin: 0 0 14px;
+}
+
+dt { color: var(--muted); }
+dd { margin: 0; }
+
+/* Menu and About */
+.page-head { padding-top: 48px; padding-bottom: 12px; }
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 40px 64px;
+  padding-bottom: 64px;
+}
+
+.menu-section h2 {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.menu-list { list-style: none; margin: 0; padding: 0; }
+.menu-list li { padding: 8px 0; }
+
+.item-line { display: flex; align-items: baseline; gap: 8px; }
+.item-name { font-weight: 600; }
+
+/* Dotted line between the item and its price, like a printed menu. */
+.leader {
+  flex: 1;
+  border-bottom: 1px dotted var(--muted);
+  transform: translateY(-4px);
+}
+
+.price { font-variant-numeric: tabular-nums; }
+.item-detail { font-size: 0.92rem; color: var(--muted); margin: 2px 0 0; }
+
+.about-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 56px;
+  padding-bottom: 64px;
+}
+
+.prose p { max-width: 36em; }
+
+.visit {
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 22px 22px 8px;
+  align-self: start;
+}
+
+/* Footer */
+.site-footer {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 24px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.footer-row p { margin: 0; }
+.deploy { font-family: var(--mono); font-size: 0.82rem; overflow-wrap: anywhere; }
+
+/* Phones and small tablets: one column. */
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .hero { padding: 40px 0 32px; }
+  .hero-grid, .about-grid, .menu-grid, .highlights { grid-template-columns: 1fr; gap: 28px; }
+  .highlights { padding-top: 32px; padding-bottom: 32px; }
+  nav { gap: 16px; }
+}

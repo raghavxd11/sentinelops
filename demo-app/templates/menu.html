@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Menu · Brewly{% endblock %}
+
+{% block content %}
+<section class="wrap page-head">
+  <h1>Menu</h1>
+  <p class="lede">Prices in rupees, taxes included. {{ milk_note }}</p>
+</section>
+
+<div class="wrap menu-grid">
+  {% for section in menu %}
+  <section class="menu-section">
+    <h2>{{ section.section }}</h2>
+    {% if section.note %}<p class="small">{{ section.note }}</p>{% endif %}
+    <ul class="menu-list">
+      {% for item in section["items"] %}
+      <li>
+        <div class="item-line">
+          <span class="item-name">{{ item.name }}</span>
+          <span class="leader" aria-hidden="true"></span>
+          <span class="price">₹{{ item.price }}</span>
+        </div>
+        {% if item.detail %}<p class="item-detail">{{ item.detail }}</p>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

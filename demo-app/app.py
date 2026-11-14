@@ -1,12 +1,19 @@
 """demo-app: the small service the SentinelOps pipeline builds and deploys.
 
-Endpoints
-    /           HTML page showing which version is running
+It is the website of Brewly, a fictional coffee shop. Every page footer shows
+the version, commit and container, so each deploy visibly changes the site.
+
+Pages (HTML, templates/ + static/style.css)
+    /           Home
+    /menu       Menu with prices
+    /about      About and visiting info
+
+Endpoints used by the pipeline and Docker
     /health     200 when healthy, 500 when BREAK_HEALTH=true
     /api/info   version and git commit as JSON
 
 Environment variables (set by the pipeline when it starts the container)
-    APP_VERSION    release version, e.g. 1.0.0
+    APP_VERSION    release version, e.g. build-42
     GIT_COMMIT     commit the image was built from
     BREAK_HEALTH   "true" makes /health fail, to demo a failed deploy and rollback
 
@@ -19,58 +26,57 @@ the restart fixes the problem (like a restart clears a hung process).
 import os
 import socket
 
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template
 
 app = Flask(__name__)
 
 BREAK_HEALTH_FILE = os.environ.get("BREAK_HEALTH_FILE", "/tmp/break-health")
 
-PAGE = """<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>demo-app {{ version }}</title>
-  <style>
-    body { margin: 0; background: #0E0F11; color: #E7E9EC;
-           font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-    main { max-width: 560px; padding: 48px 24px; }
-    h1 { font: 500 28px/1.2 ui-monospace, Consolas, monospace; margin: 0 0 4px; }
-    p { color: #9BA1AB; margin: 0 0 24px; }
-    dl { display: grid; grid-template-columns: 120px 1fr; margin: 0;
-         border: 1px solid #2A2E35; border-radius: 6px; background: #16181C; }
-    dt, dd { margin: 0; padding: 8px 14px; border-bottom: 1px solid #2A2E35; }
-    dt { color: #6B717C; }
-    dd { font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
-    dt:last-of-type, dd:last-of-type { border-bottom: 0; }
-    .ok { color: #3FB950; }
-    .bad { color: #F85149; }
-    a { color: #E7E9EC; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>demo-app</h1>
-    <p>Deployed by the SentinelOps pipeline.</p>
-    <dl>
-      <dt>Version</dt><dd>{{ version }}</dd>
-      <dt>Git commit</dt><dd>{{ git_commit }}</dd>
-      <dt>Container</dt><dd>{{ hostname }}</dd>
-      <dt>Health</dt>
-      <dd>
-        {% if healthy %}
-        <span class="ok">ok</span>
-        {% else %}
-        <span class="bad">failing</span>
-        {% endif %}
-        (<a href="/health">/health</a>)
-      </dd>
-      <dt>JSON</dt><dd><a href="/api/info">/api/info</a></dd>
-    </dl>
-  </main>
-</body>
-</html>
-"""
+# The menu lives here as plain data; templates/menu.html only lays it out.
+# Prices are in rupees.
+MENU = [
+    {
+        "section": "Espresso",
+        "note": "Our house blend: Chikmagalur and Coorg, roasted medium.",
+        "items": [
+            {"name": "Espresso", "detail": "Double shot", "price": 140},
+            {"name": "Cortado", "detail": "Equal parts espresso and steamed milk", "price": 170},
+            {"name": "Flat white", "detail": "Double shot, thin layer of milk", "price": 190},
+            {"name": "Cappuccino", "detail": "", "price": 190},
+            {"name": "Iced latte", "detail": "", "price": 210},
+        ],
+    },
+    {
+        "section": "Filter and slow",
+        "note": "Single-origin beans, changed every Tuesday.",
+        "items": [
+            {"name": "Filter coffee", "detail": "Brass dabarah, with or without chicory",
+             "price": 90},
+            {"name": "Pour-over", "detail": "V60, this week's single origin", "price": 220},
+            {"name": "Cold brew", "detail": "Steeped for 18 hours", "price": 200},
+        ],
+    },
+    {
+        "section": "Not coffee",
+        "note": "",
+        "items": [
+            {"name": "Masala chai", "detail": "Ginger, cardamom, a little pepper", "price": 80},
+            {"name": "Hot chocolate", "detail": "70% dark, made with whole milk", "price": 180},
+            {"name": "Lemon iced tea", "detail": "", "price": 150},
+        ],
+    },
+    {
+        "section": "To eat",
+        "note": "Baked each morning by Anu's, two doors down.",
+        "items": [
+            {"name": "Butter croissant", "detail": "", "price": 160},
+            {"name": "Banana walnut bread", "detail": "Toasted, with salted butter", "price": 140},
+            {"name": "Egg and cheese sandwich", "detail": "On sourdough", "price": 240},
+        ],
+    },
+]
+
+MILK_NOTE = "Oat or almond milk on anything, add 40."
 
 
 def app_info():
@@ -80,6 +86,17 @@ def app_info():
         "version": os.environ.get("APP_VERSION", "dev"),
         "git_commit": os.environ.get("GIT_COMMIT", "unknown"),
         "hostname": socket.gethostname(),
+    }
+
+
+@app.context_processor
+def deploy_info():
+    """Values every template can use, for the footer: version, short commit, container."""
+    info = app_info()
+    return {
+        "version": info["version"],
+        "short_commit": info["git_commit"][:7],
+        "hostname": info["hostname"],
     }
 
 
@@ -99,8 +116,18 @@ clear_break_health_file()
 
 
 @app.route("/")
-def index():
-    return render_template_string(PAGE, healthy=not health_is_broken(), **app_info())
+def home():
+    return render_template("home.html", page="home")
+
+
+@app.route("/menu")
+def menu():
+    return render_template("menu.html", page="menu", menu=MENU, milk_note=MILK_NOTE)
+
+
+@app.route("/about")
+def about():
+    return render_template("about.html", page="about")
 
 
 @app.route("/health")

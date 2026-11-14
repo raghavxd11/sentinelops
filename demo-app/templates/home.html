@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Brewly · Coffee roasted on Tuesdays{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>Coffee roasted on Tuesdays, poured all week.</h1>
+      <p class="lede">
+        Brewly is a twelve-seat coffee bar on Second Cross Street. We roast in the
+        back room, six kilos at a time, so the beans in your cup are never more
+        than ten days old.
+      </p>
+      <p><a class="button" href="{{ url_for('menu') }}">See the menu</a></p>
+    </div>
+
+    <aside class="this-week" aria-label="This week on filter">
+      <p class="label">This week on filter</p>
+      <p class="origin">Kenya, Kiambu</p>
+      <p>Washed SL28 and SL34. Blackcurrant, brown sugar, a bit of grapefruit at the end.</p>
+      <p class="small">Pour-over 220 · 250 g bag to take home 690</p>
+    </aside>
+  </div>
+</section>
+
+<section class="wrap highlights">
+  <article>
+    <h2>Roasted in house</h2>
+    <p>
+      Every Tuesday from six in the morning. If the roaster is running when you
+      come in, ask for a look; it smells better than the coffee.
+    </p>
+  </article>
+  <article>
+    <h2>Filter, two ways</h2>
+    <p>
+      South Indian filter coffee from a brass dabarah, chicory if you want it, or a
+      V60 pour-over of the week's single origin. Both take about four minutes.
+    </p>
+  </article>
+  <article>
+    <h2>Bakes from next door</h2>
+    <p>
+      Croissants and banana bread come from Anu's bakery two doors down, at 7:30
+      every morning. When they're gone, they're gone.
+    </p>
+  </article>
+</section>
+
+<section class="wrap hours">
+  <h2>Hours</h2>
+  <dl>
+    <dt>Monday to Friday</dt><dd>7:30 to 19:00</dd>
+    <dt>Saturday and Sunday</dt><dd>8:00 to 20:00</dd>
+  </dl>
+</section>
+{% endblock %}

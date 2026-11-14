@@ -1,4 +1,4 @@
-"""Tests for every demo-app endpoint, including the deliberately broken health check."""
+"""Tests for every demo-app page and endpoint, including the deliberately broken health check."""
 import pytest
 
 import app as demo_app
@@ -22,22 +22,95 @@ def client(monkeypatch, break_file):
     return app.test_client()
 
 
-def test_index_shows_version_and_commit(client, monkeypatch):
-    monkeypatch.setenv("APP_VERSION", "1.2.0")
-    monkeypatch.setenv("GIT_COMMIT", "7c1e4b9")
+PAGES = ["/", "/menu", "/about"]
 
-    response = client.get("/")
 
+@pytest.mark.parametrize("path", PAGES)
+def test_pages_load_as_html(client, path):
+    response = client.get(path)
     assert response.status_code == 200
     assert response.content_type.startswith("text/html")
-    assert b"demo-app" in response.data
-    assert b"1.2.0" in response.data
-    assert b"7c1e4b9" in response.data
+    assert b"Brewly" in response.data
 
 
-def test_index_escapes_environment_values(client, monkeypatch):
+@pytest.mark.parametrize("path", PAGES)
+def test_footer_shows_version_short_commit_and_container(client, monkeypatch, path):
+    monkeypatch.setenv("APP_VERSION", "build-42")
+    monkeypatch.setenv("GIT_COMMIT", "7c1e4b9d2f0a8e6b5c3d1f4a9b8e7d6c5b4a3f21")
+
+    page = client.get(path).get_data(as_text=True)
+
+    hostname = demo_app.socket.gethostname()
+    assert f"Version build-42 · commit 7c1e4b9 · container {hostname}" in page
+    assert "7c1e4b9d" not in page  # only the short commit is shown
+
+
+def test_footer_defaults_when_environment_is_not_set(client):
+    page = client.get("/").get_data(as_text=True)
+    assert "Version dev · commit unknown · container" in page
+
+
+def test_pages_escape_environment_values(client, monkeypatch):
     monkeypatch.setenv("APP_VERSION", "<script>alert(1)</script>")
-    assert b"<script>alert(1)</script>" not in client.get("/").data
+    for path in PAGES:
+        assert b"<script>alert(1)</script>" not in client.get(path).data
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_every_page_links_to_every_page(client, path):
+    page = client.get(path).get_data(as_text=True)
+    for link in PAGES:
+        assert f'href="{link}"' in page
+
+
+@pytest.mark.parametrize("path, label", [("/", "Home"), ("/menu", "Menu"), ("/about", "About")])
+def test_navigation_marks_the_current_page(client, path, label):
+    page = client.get(path).get_data(as_text=True)
+    assert f'href="{path}" aria-current="page">{label}</a>' in page
+    assert page.count('aria-current="page"') == 1
+
+
+def test_home_has_hero_and_highlights(client):
+    page = client.get("/").get_data(as_text=True)
+    assert "Coffee roasted on Tuesdays" in page
+    assert page.count("<article>") == 3
+
+
+def test_menu_lists_every_item_with_its_price(client):
+    page = client.get("/menu").get_data(as_text=True)
+    for section in demo_app.MENU:
+        assert section["section"] in page
+        for item in section["items"]:
+            assert item["name"] in page
+            assert f"₹{item['price']}" in page
+
+
+def test_menu_data_is_complete():
+    for section in demo_app.MENU:
+        assert section["items"], f"{section['section']} has no items"
+        for item in section["items"]:
+            assert item["name"]
+            assert isinstance(item["price"], int) and item["price"] > 0
+
+
+def test_about_has_visiting_info(client):
+    page = client.get("/about").get_data(as_text=True)
+    assert "Visit" in page
+    assert "12 Second Cross Street" in page
+
+
+def test_stylesheet_is_served(client):
+    response = client.get("/static/style.css")
+    assert response.status_code == 200
+    assert response.content_type.startswith("text/css")
+    response.close()
+
+
+def test_pages_still_load_while_health_is_broken(client, monkeypatch):
+    """Only /health fails during the rollback demo; the website itself keeps working."""
+    monkeypatch.setenv("BREAK_HEALTH", "true")
+    for path in PAGES:
+        assert client.get(path).status_code == 200
 
 
 def test_health_ok_by_default(client):
@@ -65,14 +138,6 @@ def test_break_health_ignores_case_and_spaces(client, monkeypatch, value):
 def test_health_stays_ok_for_other_values(client, monkeypatch, value):
     monkeypatch.setenv("BREAK_HEALTH", value)
     assert client.get("/health").status_code == 200
-
-
-def test_index_reports_failing_health(client, monkeypatch):
-    assert b"failing" not in client.get("/").data
-    monkeypatch.setenv("BREAK_HEALTH", "true")
-    response = client.get("/")
-    assert response.status_code == 200  # the page still loads, only /health fails
-    assert b"failing" in response.data
 
 
 def test_info_returns_version_and_commit_from_environment(client, monkeypatch):
