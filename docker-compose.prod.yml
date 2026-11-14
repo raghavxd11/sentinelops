@@ -1,0 +1,57 @@
+# Runs on the EC2 server: MySQL + dashboard + autoheal.
+#
+# demo-app is NOT here: the Jenkins pipeline deploys it with "docker run"
+# using an image from ECR. Start it with "--label autoheal=true" so the
+# autoheal container below also restarts it when it turns unhealthy.
+#
+# Start (on the server, in the repo folder, with a filled-in .env):
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Full steps: docs/docker.md
+
+name: sentinelops
+
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: sentinelops
+      MYSQL_USER: sentinel
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    # No "ports": MySQL is reachable only by the dashboard, inside Docker.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  dashboard:
+    build: ./dashboard          # built on the server from this repo
+    image: sentinelops-dashboard
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: mysql+pymysql://sentinel:${MYSQL_PASSWORD}@mysql:3306/sentinelops
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      API_TOKEN: ${API_TOKEN:?set API_TOKEN in .env}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    labels:
+      - autoheal=true
+    restart: unless-stopped
+
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal   # watch every container with this label
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
