@@ -1,0 +1,58 @@
+# Runs the whole stack locally: MySQL + dashboard + demo-app + autoheal.
+#   docker compose up --build -d
+
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: sentinelops
+      MYSQL_USER: sentinel
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  dashboard:
+    build: ./dashboard
+    image: sentinelops-dashboard
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: mysql+pymysql://sentinel:${MYSQL_PASSWORD}@mysql:3306/sentinelops
+      SECRET_KEY: ${SECRET_KEY}
+      API_TOKEN: ${API_TOKEN}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    labels:
+      - autoheal=true
+    restart: unless-stopped
+
+  demo-app:
+    build: ./demo-app
+    image: sentinelops-demo-app
+    ports:
+      - "8000:8000"
+    environment:
+      APP_VERSION: local
+    labels:
+      - autoheal=true
+    restart: unless-stopped
+
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
