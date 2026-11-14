@@ -1,11 +1,20 @@
 """Tests for every demo-app endpoint, including the deliberately broken health check."""
 import pytest
 
+import app as demo_app
 from app import app
 
 
 @pytest.fixture
-def client(monkeypatch):
+def break_file(tmp_path, monkeypatch):
+    """Point the break-health flag file at a temporary path (not created yet)."""
+    path = tmp_path / "break-health"
+    monkeypatch.setattr(demo_app, "BREAK_HEALTH_FILE", str(path))
+    return path
+
+
+@pytest.fixture
+def client(monkeypatch, break_file):
     # Start every test from a clean environment, whatever the shell has set.
     for name in ("APP_VERSION", "GIT_COMMIT", "BREAK_HEALTH"):
         monkeypatch.delenv(name, raising=False)
@@ -82,6 +91,31 @@ def test_info_defaults_when_environment_is_not_set(client):
     body = client.get("/api/info").get_json()
     assert body["version"] == "dev"
     assert body["git_commit"] == "unknown"
+
+
+def test_health_fails_while_break_file_exists(client, break_file):
+    assert client.get("/health").status_code == 200
+
+    break_file.touch()  # what "docker exec <container> touch /tmp/break-health" does
+    response = client.get("/health")
+    assert response.status_code == 500
+    assert response.get_json()["status"] == "unhealthy"
+
+    break_file.unlink()
+    assert client.get("/health").status_code == 200
+
+
+def test_startup_removes_break_file(client, break_file):
+    """After autoheal restarts the container, the app must start healthy again."""
+    break_file.touch()
+    demo_app.clear_break_health_file()
+    assert not break_file.exists()
+    assert client.get("/health").status_code == 200
+
+
+def test_startup_without_break_file_is_fine(break_file):
+    demo_app.clear_break_health_file()  # must not fail when there is no file
+    assert not break_file.exists()
 
 
 def test_unknown_path_is_404(client):

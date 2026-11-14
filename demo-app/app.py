@@ -9,6 +9,12 @@ Environment variables (set by the pipeline when it starts the container)
     APP_VERSION    release version, e.g. 1.0.0
     GIT_COMMIT     commit the image was built from
     BREAK_HEALTH   "true" makes /health fail, to demo a failed deploy and rollback
+
+Breaking a container that is already running (self-healing demo)
+    docker exec <container> touch /tmp/break-health
+/health fails while that file exists. Docker marks the container unhealthy,
+autoheal restarts it, and the app deletes the file when it starts again, so
+the restart fixes the problem (like a restart clears a hung process).
 """
 import os
 import socket
@@ -16,6 +22,8 @@ import socket
 from flask import Flask, jsonify, render_template_string
 
 app = Flask(__name__)
+
+BREAK_HEALTH_FILE = os.environ.get("BREAK_HEALTH_FILE", "/tmp/break-health")
 
 PAGE = """<!doctype html>
 <html lang="en">
@@ -75,8 +83,19 @@ def app_info():
     }
 
 
+def clear_break_health_file():
+    """Called once at startup: a restarted container starts healthy again."""
+    if os.path.exists(BREAK_HEALTH_FILE):
+        os.remove(BREAK_HEALTH_FILE)
+
+
 def health_is_broken():
+    if os.path.exists(BREAK_HEALTH_FILE):
+        return True
     return os.environ.get("BREAK_HEALTH", "").strip().lower() == "true"
+
+
+clear_break_health_file()
 
 
 @app.route("/")
@@ -87,7 +106,7 @@ def index():
 @app.route("/health")
 def health():
     if health_is_broken():
-        return jsonify({"status": "unhealthy", "reason": "BREAK_HEALTH is set"}), 500
+        return jsonify({"status": "unhealthy", "reason": "health check broken on purpose"}), 500
     return jsonify({"status": "ok"})
 
 
