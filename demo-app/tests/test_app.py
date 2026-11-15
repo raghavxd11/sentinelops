@@ -72,7 +72,7 @@ def test_navigation_marks_the_current_page(client, path, label):
 
 def test_home_has_hero_and_highlights(client):
     page = client.get("/").get_data(as_text=True)
-    assert "Coffee roasted on Tuesdays" in page
+    assert "Coffee roasted on Tuesday" in page
     assert page.count("<article>") == 3
 
 
